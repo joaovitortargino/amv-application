@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: oficinaBackend
+
+  data:
+    mongodb:
+      uri: mongodb://admin:admin@localhost:27017/oficina_db?authSource=admin
+      auto-index-creation: true
+
+  jackson:
+    serialization:
+      indent-output: true
+
+itau:
+  ssl:
+    key-store: ""
+    key-store-password: ""
+  mtls:
+    enabled: false
+  #base path para sandbox
+  url-auth: https://sandbox.devportal.itau.com.br/api/oauth/jwt
+  url-api: https://sandbox.devportal.itau.com.br/itau-ep9-api-boleto-v1-externo/v1/boletos
+  mock-mode: false
+  client-id: "9ce309ff-49ce-38a0-a244-c4a413530c2d"
+  client-secret: "96f7ae67-06ed-486c-a69f-6118665bfb2c"
+
+
+api:
+  security:
+    secret-key: "ba8d60a2323abe49ec8813f01ea6ea82eaff6f76f14caac64a022662f9844eec"

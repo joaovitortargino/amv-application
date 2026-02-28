@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Relatório de Ordens de Serviço - AMV</title>
+
+    <style type="text/css">
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f6f8;
+            font-size: 12px;
+        }
+
+        .clearfix {
+            clear: both;
+        }
+
+        .page-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+        }
+
+        .header {
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header-logo {
+            float: left;
+            width: 50%;
+        }
+
+        .header-text {
+            float: right;
+            width: 50%;
+            text-align: right;
+        }
+
+        .header-text .doc-type {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            letter-spacing: 2px;
+            margin: 0;
+        }
+
+        .header-text .doc-date {
+            margin-top: 5px;
+            font-size: 13px;
+            color: #7f8c8d;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .info-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 20px 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-col {
+            float: left;
+            width: 24%;
+            text-align: center;
+        }
+
+        .summary-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: block;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .summary-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .status-finished { color: #27ae60 !important; }
+        .status-open { color: #f39c12 !important; }
+        .status-canceled { color: #e74c3c !important; }
+
+        .fin-generated { color: #2980b9 !important; font-weight: bold; }
+        .fin-paid { color: #27ae60 !important; font-weight: bold; }
+        .fin-pending { color: #f39c12 !important; font-weight: bold; }
+
+        .font-bold { font-weight: bold; }
+
+        .section-title {
+            font-size: 14px;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        table.data-table th, table.data-table td {
+            border: 1px solid #ddd;
+            padding: 10px 8px;
+            text-align: left;
+        }
+
+        table.data-table th {
+            background-color: #2c3e50;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        table.data-table tbody tr:nth-child(even) {
+            background-color: #fcfcfc;
+        }
+
+        .td-center { text-align: center !important; }
+        .td-right { text-align: right !important; }
+
+        .footer-container {
+            text-align: center;
+            margin-top: 40px;
+            page-break-inside: avoid;
+            clear: both;
+        }
+
+        .company-info {
+            font-size: 11px;
+            color: #7f8c8d;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+
+        .company-info strong {
+            color: #333;
+        }
+
+        @media print {
+            body { background-color: #ffffff; padding: 0; }
+            .page-container { border: none; margin: 0; padding: 0; max-width: 100%; }
+            .info-card { border: 1px solid #ccc; }
+            .header { border-bottom: 2px solid #333; }
+            table.data-table th { background-color: #eee; color: #333; }
+            table.data-table { border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-container">
+
+    <div class="header">
+        <div class="header-logo" th:if="${logo != null}">
+            <img th:src="'data:image/png;base64,' + ${logo}" style="max-height: 80px; border-radius: 12px;" />
+        </div>
+        <div class="header-text">
+            <h2 class="doc-type">RELATÓRIO DE O.S</h2>
+            <div class="doc-date">
+                PERÍODO:
+                <span th:text="${#temporals.format(report.startDate, 'dd/MM/yyyy')}"></span>
+                ATÉ <span th:text="${#temporals.format(report.endDate, 'dd/MM/yyyy')}"></span>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+    </div>
+
+    <div class="info-card">
+        <div class="summary-col">
+            <span class="summary-label">Total de OS's</span>
+            <span class="summary-value" th:text="${report.totalOrders}">0</span>
+        </div>
+        <div class="summary-col">
+            <span class="summary-label">Finalizadas</span>
+            <span class="summary-value status-finished" th:text="${report.finishedOrders}">0</span>
+        </div>
+        <div class="summary-col">
+            <span class="summary-label">Em Aberto</span>
+            <span class="summary-value status-open" th:text="${report.openOrders}">0</span>
+        </div>
+        <div class="summary-col">
+            <span class="summary-label">Canceladas</span>
+            <span class="summary-value status-canceled" th:text="${report.canceledOrders}">0</span>
+        </div>
+        <div class="clearfix"></div>
+    </div>
+
+    <h3 class="section-title">Detalhamento das Ordens de Serviço</h3>
+
+    <table class="data-table">
+        <thead>
+        <tr>
+            <th width="10%">Nº OS</th>
+            <th width="15%">DATA ABERTURA</th>
+            <th width="25%">VEÍCULO</th>
+            <th width="12%">STATUS OS</th>
+            <th width="15%">VALOR TOTAL</th>
+            <th width="10%">FINANCEIRO</th>
+            <th width="13%">PAGAMENTO</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="os : ${report.orders}">
+            <td class="td-center font-bold" th:text="${os.osNumber}"></td>
+            <td class="td-center" th:text="${#temporals.format(os.createdAt, 'dd/MM/yyyy HH:mm')}"></td>
+            <td>
+                <span class="font-bold" th:text="${os.vehicle.model}"></span><br/>
+                <span style="font-size: 10px; color: #7f8c8d;" th:text="${os.vehicle.plate}"></span>
+            </td>
+            <td class="td-center">
+                <span class="font-bold" th:classappend="'status-' + ${os.status.name().toLowerCase()}" th:text="${os.status.description}"></span>
+            </td>
+            <td class="td-right font-bold" th:text="${#numbers.formatCurrency(os.totals.total)}"></td>
+
+            <td class="td-center">
+                <span th:if="${os.financialTitle != null}" class="fin-generated">Gerado</span>
+                <span th:if="${os.financialTitle == null}" style="color: #95a5a6;">-</span>
+            </td>
+
+            <td class="td-center">
+                <span th:if="${os.financialTitle != null}">
+                    <span th:if="${os.financialTitle.status.name() == 'PAID'}" class="fin-paid">Pago</span>
+                    <span th:if="${os.financialTitle.status.name() != 'PAID'}" class="fin-pending" th:text="${os.financialTitle.status.description}"></span>
+                </span>
+                <span th:if="${os.financialTitle == null}" style="color: #95a5a6;">-</span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="footer-container">
+        <div class="company-info">
+            Relatório gerado em <span th:text="${#temporals.format(#temporals.createNow(), 'dd/MM/yyyy HH:mm')}"></span><br /><br />
+            <strong>AMV SERVIÇO DE MECANICA LTDA</strong><br />
+            Avenida Marginal Luiz Guapo, 855 | Contato: (17) 99162-2421
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
