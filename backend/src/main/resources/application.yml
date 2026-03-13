@@ -4,7 +4,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb://admin:admin@localhost:27017/oficina_db?authSource=admin
+      uri: ${SPRING_DATA_MONGODB_URI}
       auto-index-creation: true
 
   jackson:
