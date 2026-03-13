@@ -4,7 +4,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 # Se você usa npm, mantém esses dois. Se usa yarn, troque para yarn.lock
 COPY package.json package-lock.json* ./ 
-RUN npm ci
+RUN npm install
 
 # 2. Construir o projeto
 FROM node:18-alpine AS builder
