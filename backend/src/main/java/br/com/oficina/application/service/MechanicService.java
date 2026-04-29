@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MechanicService {
+	private static final String NO_DOCUMENT_PREFIX = "__NO_CPF__:";
 
 	private final MechanicRepository repository;
 	private final UserContext userContext;
@@ -41,7 +42,7 @@ public class MechanicService {
 		mechanic.setMechanicCode(sequenceGeneratorService.generateSequence("mechanic_sequence_" + enterpriseId));
 
 		BeanUtils.copyProperties(dto, mechanic, "document");
-		mechanic.setDocument(sanitizedDocument);
+		mechanic.setDocument(toStoredDocument(sanitizedDocument, mechanic.getId()));
 		
 		Mechanic saved = repository.save(mechanic);
 		
@@ -79,7 +80,7 @@ public class MechanicService {
 		}
 		
 		BeanUtils.copyProperties(dto, existingMechanic, "document");
-		existingMechanic.setDocument(sanitizedDocument);
+		existingMechanic.setDocument(toStoredDocument(sanitizedDocument, existingMechanic.getId()));
 		Mechanic saved = repository.save(existingMechanic);
 		
 		auditService.log("UPDATE", "Mechanic", saved.getId().toString(), "Updated mechanic " + saved.getName());
@@ -107,12 +108,26 @@ public class MechanicService {
 		}
 		return document.replaceAll("\\D", "");
 	}
+
+	private String toStoredDocument(String sanitizedDocument, UUID mechanicId) {
+		if (sanitizedDocument == null || sanitizedDocument.isBlank()) {
+			return NO_DOCUMENT_PREFIX + mechanicId;
+		}
+		return sanitizedDocument;
+	}
+
+	private String toDisplayDocument(String storedDocument) {
+		if (storedDocument == null || storedDocument.startsWith(NO_DOCUMENT_PREFIX)) {
+			return null;
+		}
+		return storedDocument;
+	}
 	
 	private MechanicResponseDTO toResponseDTO(Mechanic mechanic) {
 		return new MechanicResponseDTO(
 				mechanic.getId(),
 				mechanic.getName(),
-				mechanic.getDocument(),
+				toDisplayDocument(mechanic.getDocument()),
 				mechanic.getContact(),
 				mechanic.isActive(),
 				mechanic.getStandardCommissionPercentage()

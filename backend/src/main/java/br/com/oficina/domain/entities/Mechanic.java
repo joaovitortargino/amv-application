@@ -3,8 +3,6 @@ package br.com.oficina.domain.entities;
 import br.com.oficina.domain.vo.Contact;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -12,10 +10,6 @@ import java.util.UUID;
 
 @Data
 @Document(collection="mechanics")
-@CompoundIndexes({
-		@CompoundIndex(name="enterprise_document_idx", def="{'enterpriseId': 1, 'document': 1}", unique=true,
-				partialFilter = "{ 'document': { $exists: true, $type: 'string', $ne: '' } }")
-})
 public class Mechanic {
 
 	@Id
