@@ -212,7 +212,13 @@
     <div class="info-card">
         <div class="info-section">
             <p><strong>CLIENTE:</strong> <span th:text="${client.name}"></span></p>
+            <p><strong>FANT.:</strong> <span th:text="${client.fantasyName != null ? client.fantasyName : '-'}"></span></p>
+            <p><strong>APELIDO:</strong> <span th:text="${client.nickname != null ? client.nickname : '-'}"></span></p>
+            <p><strong>SIT.:</strong> <span th:text="${client.situation != null ? client.situation : '-'}"></span></p>
             <p><strong>DOC:</strong> <span th:text="${client.document}"></span></p>
+            <p><strong>EMAIL:</strong> <span th:text="${client.emails != null ? client.emails : '-'}"></span></p>
+            <p><strong>TEL.:</strong> <span th:text="${client.telephones != null ? client.telephones : '-'}"></span></p>
+            <p><strong>CEL.:</strong> <span th:text="${client.cellPhones != null ? client.cellPhones : '-'}"></span></p>
         </div>
         <div class="info-section" style="float: right;">
             <p><strong>VEÍCULO:</strong> <span th:text="${os.vehicle.model}"></span></p>
@@ -235,7 +241,11 @@
         <tr th:each="item : ${os.items}">
             <td class="td-center" th:text="${item.mechanicCode != null ? item.mechanicCode : '-'}">0</td>
             <td class="td-center" th:text="${item.amount}"></td>
-            <td th:text="${item.name}"></td>
+            <td>
+                <span th:text="${item.name}"></span>
+                <br th:if="${item.description != null and !item.description.isEmpty()}" />
+                <span th:if="${item.description != null and !item.description.isEmpty()}" style="font-size: 10px; color: #7f8c8d;" th:text="${item.description}"></span>
+            </td>
             <td class="td-right" th:text="${#numbers.formatCurrency(item.unitValue)}"></td>
             <td class="td-right" th:text="${#numbers.formatCurrency(item.discount)}"></td>
             <td class="td-right" th:text="${#numbers.formatCurrency(item.total)}"></td>

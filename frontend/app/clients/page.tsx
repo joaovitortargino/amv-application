@@ -106,8 +106,11 @@ export default function ClientsPage() {
 
   const [formData, setFormData] = useState<ClientRequestDTO>({
     name: "",
+    fantasyName: "",
+    nickname: "",
     document: "",
     type: "PF",
+    situation: undefined,
     address: {
       cep: "",
       publicPlace: "",
@@ -117,11 +120,9 @@ export default function ClientsPage() {
       city: "",
       state: "",
     },
-    contact: {
-      email: "",
-      telephone: "",
-      cellPhone: "",
-    },
+    emails: "",
+    telephones: "",
+    cellPhones: "",
     notes: "",
   });
 
@@ -203,12 +204,32 @@ export default function ClientsPage() {
     return true;
   }
 
+  function formatPhoneList(value: string, isCellPhone: boolean): string {
+    return value
+      .split(";")
+      .map((part) => {
+        const numbers = part.replace(/\D/g, "").slice(0, isCellPhone ? 11 : 10);
+        if (isCellPhone) {
+          return numbers.replace(/(\d{2})(\d{5})(\d{0,4})/, (_, ddd, first, last) =>
+            last ? `(${ddd}) ${first}-${last}` : `(${ddd}) ${first}`,
+          );
+        }
+        return numbers.replace(/(\d{2})(\d{4})(\d{0,4})/, (_, ddd, first, last) =>
+          last ? `(${ddd}) ${first}-${last}` : `(${ddd}) ${first}`,
+        );
+      })
+      .join(";");
+  }
+
   function openCreateModal() {
     setEditingClient(null);
     setFormData({
       name: "",
+      fantasyName: "",
+      nickname: "",
       document: "",
       type: "PF",
+      situation: undefined,
       address: {
         cep: "",
         publicPlace: "",
@@ -218,11 +239,9 @@ export default function ClientsPage() {
         city: "",
         state: "",
       },
-      contact: {
-        email: "",
-        telephone: "",
-        cellPhone: "",
-      },
+      emails: "",
+      telephones: "",
+      cellPhones: "",
       notes: "",
     });
     onCreateOpen();
@@ -232,8 +251,11 @@ export default function ClientsPage() {
     setEditingClient(client);
     setFormData({
       name: client.name,
+      fantasyName: client.fantasyName || "",
+      nickname: client.nickname || "",
       document: client.document,
       type: client.type,
+      situation: client.situation,
       address: client.address || {
         cep: "",
         publicPlace: "",
@@ -243,11 +265,9 @@ export default function ClientsPage() {
         city: "",
         state: "",
       },
-      contact: client.contact || {
-        email: "",
-        telephone: "",
-        cellPhone: "",
-      },
+      emails: client.emails || "",
+      telephones: client.telephones || "",
+      cellPhones: client.cellPhones || "",
       notes: client.notes || "",
     });
     onEditOpen();
@@ -422,7 +442,7 @@ export default function ClientsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input
               className="mt-4 md:col-span-3"
-              placeholder="Buscar por nome, documento ou contato"
+              placeholder="Buscar por nome, fantasia, apelido, documento ou contato"
               value={searchTerm}
               onChange={(e) => handleSearch(e.target.value)}
               startContent={<Search size={16} />}
@@ -451,9 +471,11 @@ export default function ClientsPage() {
               <Table className="text-white">
                 <TableHeader>
                   <TableColumn>Nome</TableColumn>
+                  <TableColumn>Fantasia/Apelido</TableColumn>
                   <TableColumn>Documento</TableColumn>
                   <TableColumn>Tipo</TableColumn>
                   <TableColumn>Contato</TableColumn>
+                  <TableColumn>Situação</TableColumn>
                   <TableColumn>Status</TableColumn>
                   <TableColumn>Ações</TableColumn>
                 </TableHeader>
@@ -463,6 +485,11 @@ export default function ClientsPage() {
                     <TableRow key={client.id}>
                       <TableCell className="font-semibold">
                         {client.name}
+                      </TableCell>
+                      <TableCell>
+                        {[client.fantasyName, client.nickname]
+                          .filter(Boolean)
+                          .join(" / ") || "-"}
                       </TableCell>
                       <TableCell>
                         {formatDocument(client.document, client.type)}
@@ -476,7 +503,10 @@ export default function ClientsPage() {
                           {typeLabel[client.type]}
                         </Chip>
                       </TableCell>
-                      <TableCell>{client.contact?.email || "-"}</TableCell>
+                      <TableCell>
+                        {client.emails || client.cellPhones || client.telephones || "-"}
+                      </TableCell>
+                      <TableCell>{client.situation || "-"}</TableCell>
                       <TableCell>
                         <Chip
                           color={client.active ? "success" : "danger"}
@@ -589,6 +619,25 @@ export default function ClientsPage() {
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Input
+                    label="Nome Fantasia"
+                    placeholder="Nome de uso comercial"
+                    value={formData.fantasyName || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fantasyName: e.target.value })
+                    }
+                  />
+                  <Input
+                    label="Apelido"
+                    placeholder="Apelido para busca"
+                    value={formData.nickname || ""}
+                    onChange={(e) =>
+                      setFormData({ ...formData, nickname: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Select
                     label="Tipo"
                     selectedKeys={[formData.type]}
@@ -619,51 +668,52 @@ export default function ClientsPage() {
                     isRequired
                   />
                 </div>
+
+                <Select
+                  label="Situação do cliente"
+                  selectedKeys={formData.situation ? [formData.situation] : []}
+                  onSelectionChange={(k) =>
+                    setFormData({
+                      ...formData,
+                      situation: Array.from(k)[0] as any,
+                    })
+                  }
+                >
+                  <SelectItem key="COM_RESTRIÇÕES">COM_RESTRIÇÕES</SelectItem>
+                  <SelectItem key="BLOQUEADO">BLOQUEADO</SelectItem>
+                </Select>
               </Tab>
 
               <Tab key="contato" title="Contato" className="space-y-4">
                 <Input
-                  label="Email"
-                  type="email"
-                  placeholder="contato@example.com"
-                  value={formData.contact?.email || ""}
+                  label="E-mails"
+                  placeholder="email1@email.com;email2@email.com"
+                  value={formData.emails || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, emails: e.target.value })
+                  }
+                />
+
+                <Input
+                  label="Telefones"
+                  placeholder="(11) 3333-0000;(11) 4444-0000"
+                  value={formData.telephones || ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      contact: {
-                        ...formData.contact,
-                        email: e.target.value,
-                      },
+                      telephones: formatPhoneList(e.target.value, false),
                     })
                   }
                 />
 
                 <Input
-                  label="Telefone"
-                  placeholder="(11) 3333-0000"
-                  value={formData.contact?.telephone || ""}
+                  label="Celulares"
+                  placeholder="(11) 99999-0000;(11) 98888-0000"
+                  value={formData.cellPhones || ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      contact: {
-                        ...formData.contact,
-                        telephone: e.target.value,
-                      },
-                    })
-                  }
-                />
-
-                <Input
-                  label="Celular"
-                  placeholder="(11) 99999-0000"
-                  value={formData.contact?.cellPhone || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      contact: {
-                        ...formData.contact,
-                        cellPhone: e.target.value,
-                      },
+                      cellPhones: formatPhoneList(e.target.value, true),
                     })
                   }
                 />

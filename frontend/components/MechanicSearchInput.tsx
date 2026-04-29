@@ -50,7 +50,7 @@ export function MechanicSearchInput({
         filtered = res.filter(
           (m) =>
             m.name.toLowerCase().includes(search.toLowerCase()) ||
-            m.document.includes(search),
+        (m.document || "").includes(search),
         );
       }
 
@@ -119,7 +119,7 @@ export function MechanicSearchInput({
           {mechanics.map((mechanic) => (
             <AutocompleteItem
               key={mechanic.id}
-              textValue={`${mechanic.name} - ${mechanic.document}`}
+              textValue={`${mechanic.name} - ${mechanic.document || ""}`}
             >
               <div className="flex justify-between items-center w-full">
                 <span>{mechanic.name}</span>

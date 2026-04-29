@@ -13,7 +13,8 @@ import java.util.UUID;
 @Data
 @Document(collection="mechanics")
 @CompoundIndexes({
-		@CompoundIndex(name="enterprise_document_idx", def="{'enterpriseId': 1, 'document': 1}", unique=true)
+		@CompoundIndex(name="enterprise_document_idx", def="{'enterpriseId': 1, 'document': 1}", unique=true,
+				partialFilter = "{ 'document': { $exists: true, $type: 'string', $ne: '' } }")
 })
 public class Mechanic {
 

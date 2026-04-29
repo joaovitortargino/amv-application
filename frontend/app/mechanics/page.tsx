@@ -142,8 +142,8 @@ export default function MechanicsPage() {
     filterData(data, value);
   }
 
-  function formatCPF(value: string): string {
-    const numbers = value.replace(/\D/g, "");
+  function formatCPF(value?: string): string {
+    const numbers = (value || "").replace(/\D/g, "");
     return numbers
       .slice(0, 11)
       .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
@@ -199,15 +199,15 @@ export default function MechanicsPage() {
   }
 
   async function handleSave() {
-    if (!formData.name || !formData.document) {
+    if (!formData.name) {
       addToast({
-        title: "Preencha nome e CPF",
+        title: "Preencha o nome",
         color: "warning",
       });
       return;
     }
 
-    if (!validateCPF(formData.document)) {
+    if (formData.document && !validateCPF(formData.document)) {
       return;
     }
 
@@ -459,7 +459,6 @@ export default function MechanicsPage() {
                     const raw = e.target.value.replace(/\D/g, "");
                     setFormData({ ...formData, document: raw });
                   }}
-                  isRequired
                 />
 
                 <Input

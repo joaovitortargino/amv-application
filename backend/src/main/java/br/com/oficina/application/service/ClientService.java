@@ -114,9 +114,14 @@ public class ClientService {
 
 	private void updateClientData(Client target, ClientRequestDTO source) {
 		if (source.name() != null) target.setName(source.name());
+		if (source.fantasyName() != null) target.setFantasyName(source.fantasyName());
+		if (source.nickname() != null) target.setNickname(source.nickname());
 		if (source.type() != null) target.setType(source.type());
+		if (source.situation() != null) target.setSituation(source.situation());
 		if (source.address() != null) target.setAddress(source.address());
-		if (source.contact() != null) target.setContact(source.contact());
+		if (source.emails() != null) target.setEmails(source.emails());
+		if (source.telephones() != null) target.setTelephones(source.telephones());
+		if (source.cellPhones() != null) target.setCellPhones(source.cellPhones());
 		if (source.notes() != null) target.setNotes(source.notes());
 	}
 

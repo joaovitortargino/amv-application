@@ -8,6 +8,7 @@ public record ItemOSRequestDTO(
     String productServiceId,
     TypeItem type,
     String name,
+    String description,
     BigDecimal amount,
     BigDecimal unitValue,
     BigDecimal discount,

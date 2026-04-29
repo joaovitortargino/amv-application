@@ -26,8 +26,9 @@ public class MechanicService {
 	@Transactional
 	public MechanicResponseDTO save(MechanicRequestDTO dto) {
 		UUID enterpriseId = userContext.getCurrentEnterpriseId();
+		String sanitizedDocument = sanitizeDocument(dto.document());
 		
-		if (repository.existsByDocumentAndEnterpriseId(dto.document(), enterpriseId)) {
+		if (sanitizedDocument != null && repository.existsByDocumentAndEnterpriseId(sanitizedDocument, enterpriseId)) {
 			throw new IllegalArgumentException("Mechanic is already registered with this document");
 		}
 		if (dto.standardCommissionPercentage() == null) {
@@ -39,7 +40,8 @@ public class MechanicService {
 		// Gera o código sequencial único por empresa
 		mechanic.setMechanicCode(sequenceGeneratorService.generateSequence("mechanic_sequence_" + enterpriseId));
 
-		BeanUtils.copyProperties(dto, mechanic);
+		BeanUtils.copyProperties(dto, mechanic, "document");
+		mechanic.setDocument(sanitizedDocument);
 		
 		Mechanic saved = repository.save(mechanic);
 		
@@ -68,13 +70,16 @@ public class MechanicService {
 		Mechanic existingMechanic = repository.findByIdAndEnterpriseId(id, enterpriseId)
 				.orElseThrow(() -> new IllegalArgumentException("Mechanic not found"));
 		
+		String sanitizedDocument = sanitizeDocument(dto.document());
 		// Se o documento mudou, verificar se já existe outro com esse documento NA MESMA EMPRESA
-		if (!existingMechanic.getDocument().equals(dto.document()) && 
-			repository.existsByDocumentAndEnterpriseId(dto.document(), enterpriseId)) {
+		if (sanitizedDocument != null &&
+			!sanitizedDocument.equals(existingMechanic.getDocument()) &&
+			repository.existsByDocumentAndEnterpriseId(sanitizedDocument, enterpriseId)) {
 			throw new IllegalArgumentException("Mechanic is already registered with this document");
 		}
 		
-		BeanUtils.copyProperties(dto, existingMechanic);
+		BeanUtils.copyProperties(dto, existingMechanic, "document");
+		existingMechanic.setDocument(sanitizedDocument);
 		Mechanic saved = repository.save(existingMechanic);
 		
 		auditService.log("UPDATE", "Mechanic", saved.getId().toString(), "Updated mechanic " + saved.getName());
@@ -94,6 +99,13 @@ public class MechanicService {
 		auditService.log("UPDATE", "Mechanic", saved.getId().toString(), "Changed active status to " + saved.isActive());
 		
 		return toResponseDTO(saved);
+	}
+
+	private String sanitizeDocument(String document) {
+		if (document == null || document.isBlank()) {
+			return null;
+		}
+		return document.replaceAll("\\D", "");
 	}
 	
 	private MechanicResponseDTO toResponseDTO(Mechanic mechanic) {

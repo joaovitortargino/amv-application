@@ -15,14 +15,17 @@ public interface ClientRepository extends MongoRepository <Client, UUID> {
 	
 	boolean existsByDocumentAndEnterpriseId(String document, UUID enterpriseId);
 
-	// Busca inteligente: Nome OU Documento OU Email OU Telefone (FILTRADO POR EMPRESA)
+	// Busca inteligente: Nome, fantasia, apelido, documento, e-mails ou telefones (FILTRADO POR EMPRESA)
 	@Query("{" +
 			"  'enterpriseId': ?1," +
 			"  $or: [" +
 			"    { 'name': { $regex: ?0, $options: 'i' } }," +
+			"    { 'fantasyName': { $regex: ?0, $options: 'i' } }," +
+			"    { 'nickname': { $regex: ?0, $options: 'i' } }," +
 			"    { 'document': { $regex: ?0, $options: 'i' } }," +
-			"    { 'contact.email': { $regex: ?0, $options: 'i' } }," +
-			"    { 'contact.cellPhone': { $regex: ?0, $options: 'i' } }" +
+			"    { 'emails': { $regex: ?0, $options: 'i' } }," +
+			"    { 'telephones': { $regex: ?0, $options: 'i' } }," +
+			"    { 'cellPhones': { $regex: ?0, $options: 'i' } }" +
 			"  ]," +
 			"  'active': true" +
 			"}")

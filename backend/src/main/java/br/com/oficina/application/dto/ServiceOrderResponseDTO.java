@@ -1,6 +1,7 @@
 package br.com.oficina.application.dto;
 
 import br.com.oficina.domain.entities.FinancialTitle;
+import br.com.oficina.domain.entities.Client;
 import br.com.oficina.domain.enums.StatusOS;
 import br.com.oficina.domain.vo.FinancialTotals;
 import br.com.oficina.domain.vo.ItemOS;
@@ -13,6 +14,7 @@ public record ServiceOrderResponseDTO(
     UUID id,
     String osNumber,
     String clientId,
+    Client client,
     Vehicle vehicle,
     List<ItemOS> items,
     FinancialTotals totals,

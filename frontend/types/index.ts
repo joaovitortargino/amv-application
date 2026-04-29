@@ -23,6 +23,8 @@ export interface Contact {
   cellPhone?: string;
 }
 
+export type ClientSituation = "COM_RESTRIÇÕES" | "BLOQUEADO";
+
 export interface Address {
   cep: string;
   publicPlace: string;
@@ -58,9 +60,14 @@ export interface RegisterData {
 export interface Client {
   id: string;
   name: string;
+  fantasyName?: string;
+  nickname?: string;
   document: string;
   type: "PF" | "PJ";
-  contact: Contact;
+  situation?: ClientSituation;
+  emails?: string;
+  telephones?: string;
+  cellPhones?: string;
   address: Address;
   active: boolean;
 }
@@ -95,21 +102,22 @@ export interface ServiceOrder {
 
 export interface Vehicle {
   plate: string;
-  model: string;
-  mark: string;
-  year: number;
+  model?: string;
+  mark?: string;
+  year?: number;
 }
 
 export interface ServiceOrderItem {
   id?: string;
-  productServiceId: string;
+  productServiceId?: string;
   type: "PRODUCT" | "SERVICE";
   name: string;
+  description?: string;
   amount: number;
   unitValue: number;
   discount: number;
   totalValue?: number;
-  mechanicId: string;
+  mechanicId?: string;
   mechanic?: MechanicDTO;
 }
 
@@ -117,7 +125,7 @@ export interface MechanicDTO {
   id: string;
   mechanicCode: number;
   name: string;
-  document: string;
+  document?: string;
   contact: Contact;
   active: boolean;
   standardCommissionPercentage: number;
@@ -219,8 +227,11 @@ export interface SlipDTO {
 export interface ClientDTO {
   id: string;
   name: string;
+  fantasyName?: string;
+  nickname?: string;
   document: string;
   type: "PF" | "PJ";
+  situation?: ClientSituation;
   address?: {
     cep: string;
     publicPlace: string;
@@ -230,15 +241,35 @@ export interface ClientDTO {
     city: string;
     state: string;
   };
-  contact: {
-    email: string;
-    telephone?: string;
-    cellPhone?: string;
-  };
+  emails?: string;
+  telephones?: string;
+  cellPhones?: string;
   notes?: string;
   active: boolean;
   createdAt: string;
   lastUpdate?: string;
+}
+
+export interface ClientRequestDTO {
+  name: string;
+  fantasyName?: string;
+  nickname?: string;
+  document: string;
+  type: "PF" | "PJ";
+  situation?: ClientSituation;
+  address: Address;
+  emails?: string;
+  telephones?: string;
+  cellPhones?: string;
+  notes?: string;
+}
+
+export interface MechanicRequestDTO {
+  name: string;
+  document?: string;
+  contact?: Contact;
+  active?: boolean;
+  standardCommissionPercentage: number;
 }
 
 export interface ServiceOrderDTO {

@@ -1,8 +1,8 @@
 package br.com.oficina.domain.entities;
 
+import br.com.oficina.domain.enums.ClientSituation;
 import br.com.oficina.domain.enums.ClientType;
 import br.com.oficina.domain.vo.Address;
-import br.com.oficina.domain.vo.Contact;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -25,13 +25,18 @@ public class Client {
 	private UUID enterpriseId; // Vinculo com a empresa (Multi-tenancy)
 	
 	private String name;
+	private String fantasyName;
+	private String nickname;
 	
 	private String document; // CPF ou CNPJ (apenas números)
 	
 	private ClientType type; // PF ou PJ
+	private ClientSituation situation;
 	
 	private Address address;
-	private Contact contact;
+	private String emails;
+	private String telephones;
+	private String cellPhones;
 	
 	private LocalDateTime createdAt = LocalDateTime.now();
 	private LocalDateTime lastUpdate = LocalDateTime.now();

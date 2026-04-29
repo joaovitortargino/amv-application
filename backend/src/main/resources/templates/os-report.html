@@ -209,7 +209,9 @@
         <thead>
         <tr>
             <th width="10%">Nº OS</th>
-            <th width="15%">DATA ABERTURA</th>
+            <th width="12%">DATA ABERTURA</th>
+            <th width="18%">CLIENTE</th>
+            <th width="18%">CONTATOS</th>
             <th width="25%">VEÍCULO</th>
             <th width="12%">STATUS OS</th>
             <th width="15%">VALOR TOTAL</th>
@@ -222,7 +224,18 @@
             <td class="td-center font-bold" th:text="${os.osNumber}"></td>
             <td class="td-center" th:text="${#temporals.format(os.createdAt, 'dd/MM/yyyy HH:mm')}"></td>
             <td>
-                <span class="font-bold" th:text="${os.vehicle.model}"></span><br/>
+                <span class="font-bold" th:text="${os.client != null ? os.client.name : '-'}"></span><br/>
+                <span style="font-size: 10px; color: #7f8c8d;" th:text="${os.client != null and os.client.fantasyName != null ? os.client.fantasyName : '-'}"></span><br/>
+                <span style="font-size: 10px; color: #7f8c8d;" th:text="${os.client != null and os.client.nickname != null ? os.client.nickname : '-'}"></span><br/>
+                <span style="font-size: 10px; color: #7f8c8d;" th:text="${os.client != null and os.client.situation != null ? os.client.situation : '-'}"></span>
+            </td>
+            <td>
+                <span style="font-size: 10px;" th:text="${os.client != null and os.client.emails != null ? os.client.emails : '-'}"></span><br/>
+                <span style="font-size: 10px;" th:text="${os.client != null and os.client.telephones != null ? os.client.telephones : '-'}"></span><br/>
+                <span style="font-size: 10px;" th:text="${os.client != null and os.client.cellPhones != null ? os.client.cellPhones : '-'}"></span>
+            </td>
+            <td>
+                <span class="font-bold" th:text="${os.vehicle.model != null ? os.vehicle.model : '-'}"></span><br/>
                 <span style="font-size: 10px; color: #7f8c8d;" th:text="${os.vehicle.plate}"></span>
             </td>
             <td class="td-center">

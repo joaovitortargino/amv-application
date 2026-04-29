@@ -72,6 +72,7 @@ export function ServiceOrderDetailsModal({
   >({
     productServiceId: "",
     name: "",
+    description: "",
     type: "PRODUCT",
     amount: 1,
     unitValue: 0,
@@ -141,20 +142,14 @@ export function ServiceOrderDetailsModal({
 
   async function handleAddItem() {
     if (
-      !draftItem.productServiceId ||
+      !draftItem.name ||
       !draftItem.amount ||
-      draftItem.amount <= 0
+      draftItem.amount <= 0 ||
+      !draftItem.unitValue ||
+      draftItem.unitValue <= 0
     ) {
       addToast({
         title: "Selecione um produto e quantidade válida",
-        color: "warning",
-      });
-      return;
-    }
-
-    if (draftItem.type === "SERVICE" && !draftItem.mechanicId) {
-      addToast({
-        title: "Selecione um mecânico para este serviço",
         color: "warning",
       });
       return;
@@ -168,6 +163,7 @@ export function ServiceOrderDetailsModal({
           productServiceId: draftItem.productServiceId,
           type: draftItem.type,
           name: draftItem.name,
+          description: draftItem.description,
           amount: draftItem.amount,
           unitValue: draftItem.unitValue,
           discount: draftItem.discount,
@@ -181,6 +177,7 @@ export function ServiceOrderDetailsModal({
       setDraftItem({
         productServiceId: "",
         name: "",
+        description: "",
         type: "PRODUCT",
         amount: 1,
         unitValue: 0,
@@ -373,7 +370,7 @@ export function ServiceOrderDetailsModal({
                 </h3>
                 <div className="flex items-center gap-1 text-blue-400 text-xs bg-blue-950/30 px-2 py-1 rounded">
                   <AlertCircle size={14} />
-                  <span>Mecânico obrigatório apenas para serviços</span>
+                  <span>Itens livres não exigem cadastro prévio</span>
                 </div>
               </div>
 
@@ -422,6 +419,67 @@ export function ServiceOrderDetailsModal({
                       </SelectItem>
                     ))}
                   </Select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <Select
+                    label="Tipo"
+                    size="sm"
+                    selectedKeys={draftItem.type ? [draftItem.type] : []}
+                    onSelectionChange={(k) =>
+                      setDraftItem({
+                        ...draftItem,
+                        type: Array.from(k)[0] as any,
+                        mechanicId:
+                          Array.from(k)[0] === "SERVICE"
+                            ? draftItem.mechanicId
+                            : undefined,
+                      })
+                    }
+                  >
+                    <SelectItem key="PRODUCT">Produto</SelectItem>
+                    <SelectItem key="SERVICE">Serviço</SelectItem>
+                  </Select>
+                </div>
+
+                <div className="md:col-span-5">
+                  <Input
+                    label="Item livre"
+                    size="sm"
+                    value={draftItem.name || ""}
+                    onChange={(e) =>
+                      setDraftItem({ ...draftItem, name: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="md:col-span-8">
+                  <Input
+                    label="Descrição livre"
+                    size="sm"
+                    value={draftItem.description || ""}
+                    onChange={(e) =>
+                      setDraftItem({
+                        ...draftItem,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="md:col-span-4">
+                  <Input
+                    type="number"
+                    label="Valor livre"
+                    size="sm"
+                    value={draftItem.unitValue?.toString()}
+                    onChange={(e) =>
+                      setDraftItem({
+                        ...draftItem,
+                        unitValue: Number(e.target.value),
+                      })
+                    }
+                  />
                 </div>
 
                 <div className="md:col-span-2">
@@ -486,7 +544,7 @@ export function ServiceOrderDetailsModal({
                       });
                     }}
                     selectedMechanicName={draftItem.mechanicName}
-                    isRequired={true}
+                    isRequired={false}
                   />
                 </div>
               )}

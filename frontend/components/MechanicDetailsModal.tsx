@@ -34,8 +34,8 @@ interface MechanicDetailsModalProps {
   mechanic: MechanicDTO | null;
 }
 
-function formatCPF(value: string): string {
-  const n = value.replace(/\D/g, "");
+function formatCPF(value?: string): string {
+  const n = (value || "").replace(/\D/g, "");
   return n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
 }
 

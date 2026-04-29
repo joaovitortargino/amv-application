@@ -143,6 +143,7 @@ export default function ServiceOrderPage() {
   >({
     productServiceId: "",
     name: "",
+    description: "",
     type: "PRODUCT",
     amount: 1,
     unitValue: 0,
@@ -151,6 +152,42 @@ export default function ServiceOrderPage() {
     mechanicName: undefined,
   });
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
+  function resetNewOrderForm() {
+    setNewOrder({
+      clientId: "",
+      vehicle: {
+        plate: "",
+        model: "",
+        mark: "",
+        year: undefined,
+      },
+      observations: "",
+      items: [],
+    });
+    setSelectedClient(null);
+    setDraftItem({
+      productServiceId: "",
+      name: "",
+      description: "",
+      type: "PRODUCT",
+      amount: 1,
+      unitValue: 0,
+      discount: 0,
+      mechanicId: undefined,
+      mechanicName: undefined,
+    });
+  }
+
+  function openCreateOrderModal() {
+    resetNewOrderForm();
+    onCreateOpen();
+  }
+
+  function closeCreateOrderModal() {
+    resetNewOrderForm();
+    onCreateClose();
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -296,20 +333,14 @@ export default function ServiceOrderPage() {
 
   function handleAddDraftItem() {
     if (
-      !draftItem.productServiceId ||
+      !draftItem.name ||
       !draftItem.amount ||
-      draftItem.amount <= 0
+      draftItem.amount <= 0 ||
+      !draftItem.unitValue ||
+      draftItem.unitValue <= 0
     ) {
       addToast({
         title: "Selecione um produto/serviço e informe uma quantidade válida",
-        color: "warning",
-      });
-      return;
-    }
-
-    if (draftItem.type === "SERVICE" && !draftItem.mechanicId) {
-      addToast({
-        title: "Selecione um mecânico para este serviço",
         color: "warning",
       });
       return;
@@ -322,6 +353,7 @@ export default function ServiceOrderPage() {
       productServiceId: draftItem.productServiceId,
       type: draftItem.type,
       name: draftItem.name,
+      description: draftItem.description,
       amount: draftItem.amount,
       unitValue: draftItem.unitValue,
       discount: draftItem.discount,
@@ -338,6 +370,7 @@ export default function ServiceOrderPage() {
     setDraftItem({
       productServiceId: "",
       name: "",
+      description: "",
       type: "PRODUCT",
       amount: 1,
       unitValue: 0,
@@ -356,8 +389,7 @@ export default function ServiceOrderPage() {
   async function handleCreateOrder() {
     if (
       !selectedClient ||
-      !newOrder.vehicle?.plate ||
-      !newOrder.vehicle?.model
+      !newOrder.vehicle?.plate
     ) {
       addToast({
         title: "Preencha o cliente e os dados básicos do veículo",
@@ -377,20 +409,7 @@ export default function ServiceOrderPage() {
     setActionLoading("create");
     try {
       await apiService.post("service-orders", newOrder);
-      onCreateClose();
-
-      setNewOrder({
-        clientId: "",
-        vehicle: {
-          plate: "",
-          model: "",
-          mark: "",
-          year: new Date().getFullYear(),
-        },
-        observations: "",
-        items: [],
-      });
-      setSelectedClient(null);
+      closeCreateOrderModal();
 
       addToast({ title: "OS criada com sucesso!", color: "success" });
       load();
@@ -503,7 +522,7 @@ export default function ServiceOrderPage() {
             color="warning"
             className="text-black"
             startContent={<Plus size={16} />}
-            onPress={onCreateOpen}
+            onPress={openCreateOrderModal}
           >
             Nova OS
           </Button>
@@ -736,7 +755,7 @@ export default function ServiceOrderPage() {
         </div>
       </motion.div>
 
-      <Modal isOpen={isCreateOpen} onClose={onCreateClose} size="4xl">
+      <Modal isOpen={isCreateOpen} onClose={closeCreateOrderModal} size="4xl">
         <ModalContent>
           <ModalHeader>Abrir Nova Ordem de Serviço</ModalHeader>
           <ModalBody className="space-y-4">
@@ -786,7 +805,6 @@ export default function ServiceOrderPage() {
                       },
                     })
                   }
-                  isRequired
                 />
               </div>
 
@@ -805,7 +823,6 @@ export default function ServiceOrderPage() {
                       },
                     })
                   }
-                  isRequired
                 />
                 <Input
                   type="number"
@@ -844,7 +861,7 @@ export default function ServiceOrderPage() {
                 </h3>
                 <div className="flex items-center gap-1 text-blue-400 text-xs bg-blue-950/30 px-2 py-1 rounded">
                   <AlertCircle size={14} />
-                  <span>Mecânico obrigatório apenas para serviços</span>
+                  <span>Itens livres não exigem cadastro prévio</span>
                 </div>
               </div>
 
@@ -893,6 +910,65 @@ export default function ServiceOrderPage() {
                         </SelectItem>
                       ))}
                     </Select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Select
+                      label="Tipo"
+                      selectedKeys={draftItem.type ? [draftItem.type] : []}
+                      onSelectionChange={(k) =>
+                        setDraftItem({
+                          ...draftItem,
+                          type: Array.from(k)[0] as any,
+                          mechanicId:
+                            Array.from(k)[0] === "SERVICE"
+                              ? draftItem.mechanicId
+                              : undefined,
+                        })
+                      }
+                    >
+                      <SelectItem key="PRODUCT">Produto</SelectItem>
+                      <SelectItem key="SERVICE">Serviço</SelectItem>
+                    </Select>
+                  </div>
+
+                  <div className="md:col-span-5">
+                    <Input
+                      label="Item livre"
+                      placeholder="Produto ou serviço"
+                      value={draftItem.name || ""}
+                      onChange={(e) =>
+                        setDraftItem({ ...draftItem, name: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="md:col-span-8">
+                    <Input
+                      label="Descrição livre"
+                      placeholder="Descrição manual do item"
+                      value={draftItem.description || ""}
+                      onChange={(e) =>
+                        setDraftItem({
+                          ...draftItem,
+                          description: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="md:col-span-4">
+                    <Input
+                      type="number"
+                      label="Valor livre"
+                      value={draftItem.unitValue?.toString()}
+                      onChange={(e) =>
+                        setDraftItem({
+                          ...draftItem,
+                          unitValue: Number(e.target.value),
+                        })
+                      }
+                    />
                   </div>
 
                   <div className="md:col-span-2">
@@ -953,7 +1029,7 @@ export default function ServiceOrderPage() {
                         });
                       }}
                       selectedMechanicName={draftItem.mechanicName}
-                      isRequired={true}
+                      isRequired={false}
                     />
                   </div>
                 )}
@@ -1042,7 +1118,7 @@ export default function ServiceOrderPage() {
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="light" onClick={onCreateClose}>
+            <Button variant="light" onClick={closeCreateOrderModal}>
               Cancelar
             </Button>
             <Button

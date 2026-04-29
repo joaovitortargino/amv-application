@@ -4,6 +4,7 @@ import br.com.oficina.application.dto.ItemOSRequestDTO;
 import br.com.oficina.application.dto.ServiceOrderReportDTO;
 import br.com.oficina.application.dto.ServiceOrderRequestDTO;
 import br.com.oficina.application.dto.ServiceOrderResponseDTO;
+import br.com.oficina.domain.entities.Client;
 import br.com.oficina.domain.entities.FinancialTitle;
 import br.com.oficina.domain.entities.Mechanic;
 import br.com.oficina.domain.entities.ServiceOrder;
@@ -92,6 +93,7 @@ public class ServiceOrderService {
 						itemDto.productServiceId(),
 						itemDto.type(),
 						itemDto.name(),
+						itemDto.description(),
 						itemDto.amount(),
 						itemDto.unitValue(),
 						itemDto.discount() != null ? itemDto.discount() : BigDecimal.ZERO,
@@ -135,6 +137,7 @@ public class ServiceOrderService {
 				itemDto.productServiceId(),
 				itemDto.type(),
 				itemDto.name(),
+				itemDto.description(),
 				itemDto.amount(),
 				itemDto.unitValue(),
 				itemDto.discount() != null ? itemDto.discount() : BigDecimal.ZERO,
@@ -315,10 +318,20 @@ public class ServiceOrderService {
 			financialTitle = financialTitleRepository.findById(os.getFinancialTitleId()).orElse(null);
 		}
 
+		Client client = null;
+		if (os.getClientId() != null) {
+			try {
+				client = clientService.findById(UUID.fromString(os.getClientId()));
+			} catch (Exception ignored) {
+				client = null;
+			}
+		}
+
 		return new ServiceOrderResponseDTO(
 				os.getId(),
 				os.getOSnumber(),
 				os.getClientId(),
+				client,
 				os.getVehicle(),
 				os.getItemOS(),
 				os.getTotals(),

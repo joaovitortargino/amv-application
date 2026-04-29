@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Input, Card, Spinner } from "@heroui/react";
+import { useEffect, useRef, useState } from "react";
+import { Card, Input, Spinner } from "@heroui/react";
 import { Search, X } from "lucide-react";
 import { apiService } from "@/services/api";
 import { ClientDTO, PageResponse } from "@/types";
@@ -34,6 +34,7 @@ export function ClientSearchInput({
         setShowDropdown(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -75,6 +76,17 @@ export function ClientSearchInput({
     setClients([]);
   }
 
+  function clientSubtitle(client: ClientDTO) {
+    return (
+      client.nickname ||
+      client.fantasyName ||
+      client.cellPhones ||
+      client.telephones ||
+      client.emails ||
+      "-"
+    );
+  }
+
   return (
     <div ref={wrapperRef} className="relative">
       <Input
@@ -110,7 +122,7 @@ export function ClientSearchInput({
               >
                 <p className="font-semibold text-sm">{client.name}</p>
                 <p className="text-xs text-gray-500">
-                  {client.document} • {client.contact.cellPhone}
+                  {client.document} - {clientSubtitle(client)}
                 </p>
               </button>
             ))}
