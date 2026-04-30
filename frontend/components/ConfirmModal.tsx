@@ -20,6 +20,7 @@ interface ConfirmModalProps {
   cancelText?: string;
   variant?: "danger" | "warning" | "success" | "info";
   isLoading?: boolean;
+  hideCancel?: boolean;
 }
 
 export function ConfirmModal({
@@ -32,6 +33,7 @@ export function ConfirmModal({
   cancelText = "Cancelar",
   variant = "warning",
   isLoading = false,
+  hideCancel = false,
 }: ConfirmModalProps) {
   const variantConfig = {
     danger: {
@@ -79,9 +81,11 @@ export function ConfirmModal({
           </div>
         </ModalBody>
         <ModalFooter>
-          <Button variant="light" onClick={onClose} isDisabled={isLoading}>
-            {cancelText}
-          </Button>
+          {!hideCancel && (
+            <Button variant="light" onClick={onClose} isDisabled={isLoading}>
+              {cancelText}
+            </Button>
+          )}
           <Button
             color={config.buttonColor}
             onClick={onConfirm}

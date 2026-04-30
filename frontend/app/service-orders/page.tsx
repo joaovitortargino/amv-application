@@ -114,6 +114,18 @@ export default function ServiceOrderPage() {
   } = useDisclosure();
 
   const {
+    isOpen: isBlockedClientOpen,
+    onOpen: onBlockedClientOpen,
+    onClose: onBlockedClientClose,
+  } = useDisclosure();
+
+  const {
+    isOpen: isRestrictedClientOpen,
+    onOpen: onRestrictedClientOpen,
+    onClose: onRestrictedClientClose,
+  } = useDisclosure();
+
+  const {
     isOpen: isCreateOpen,
     onOpen: onCreateOpen,
     onClose: onCreateClose,
@@ -386,6 +398,23 @@ export default function ServiceOrderPage() {
     setNewOrder({ ...newOrder, items: updatedItems });
   }
 
+  function getSelectedClientName() {
+    return (
+      selectedClient?.name ||
+      selectedClient?.fantasyName ||
+      selectedClient?.nickname ||
+      "cliente selecionado"
+    );
+  }
+
+  function isBlockedClient(client: ClientDTO | null) {
+    return client?.situation === "BLOQUEADO";
+  }
+
+  function isRestrictedClient(client: ClientDTO | null) {
+    return Boolean(client?.situation?.toUpperCase().includes("RESTRI"));
+  }
+
   async function handleCreateOrder() {
     if (
       !selectedClient ||
@@ -406,6 +435,35 @@ export default function ServiceOrderPage() {
       return;
     }
 
+    if (isBlockedClient(selectedClient)) {
+      onBlockedClientOpen();
+      return;
+    }
+
+    if (isRestrictedClient(selectedClient)) {
+      onRestrictedClientOpen();
+      return;
+    }
+
+    setActionLoading("create");
+    try {
+      await apiService.post("service-orders", newOrder);
+      closeCreateOrderModal();
+
+      addToast({ title: "OS criada com sucesso!", color: "success" });
+      load();
+    } catch (error: any) {
+      addToast({
+        title: error?.message || "Erro ao criar OS",
+        color: "danger",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function confirmCreateRestrictedClientOrder() {
+    onRestrictedClientClose();
     setActionLoading("create");
     try {
       await apiService.post("service-orders", newOrder);
@@ -471,14 +529,25 @@ export default function ServiceOrderPage() {
     }
   }
 
+  function getClientName(os: ServiceOrderDTO) {
+    return (
+      os.client?.name ||
+      os.client?.fantasyName ||
+      os.client?.nickname ||
+      "N/A"
+    );
+  }
+
   const filteredData = data.filter((os) => {
     const term = filters.text.toLowerCase();
     const matchOS = os.osNumber?.toLowerCase().includes(term);
-    const matchVehicle =
-      os.vehicle?.plate?.toLowerCase().includes(term) ||
-      os.vehicle?.model?.toLowerCase().includes(term) ||
-      os.vehicle?.mark?.toLowerCase().includes(term);
-    return matchOS || matchVehicle;
+    const matchClient = [
+      os.client?.name,
+      os.client?.fantasyName,
+      os.client?.nickname,
+      os.client?.document,
+    ].some((value) => value?.toLowerCase().includes(term));
+    return matchOS || matchClient;
   });
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -515,7 +584,7 @@ export default function ServiceOrderPage() {
           <div>
             <h2 className="text-3xl font-bold text-white">Ordens de Serviço</h2>
             <p className="text-gray-500">
-              Controle de manutenções, veículos e serviços
+              Controle de manutenções, clientes e serviços
             </p>
           </div>
           <Button
@@ -556,7 +625,7 @@ export default function ServiceOrderPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <Input
               className="mt-4 md:col-span-2"
-              placeholder="Buscar por número da OS ou veículo"
+              placeholder="Buscar por número da OS ou cliente"
               value={filters.text}
               onChange={(e) => setFilters({ ...filters, text: e.target.value })}
               startContent={<Search size={16} />}
@@ -616,7 +685,7 @@ export default function ServiceOrderPage() {
               <Table className="text-white">
                 <TableHeader>
                   <TableColumn>Nº OS</TableColumn>
-                  <TableColumn>Veículo</TableColumn>
+                  <TableColumn>Cliente</TableColumn>
                   <TableColumn>Criação</TableColumn>
                   <TableColumn>Total</TableColumn>
                   <TableColumn>Status</TableColumn>
@@ -629,10 +698,8 @@ export default function ServiceOrderPage() {
                       <TableCell className="font-semibold">
                         {os.osNumber}
                       </TableCell>
-                      <TableCell>
-                        {os.vehicle
-                          ? `${os.vehicle.mark} ${os.vehicle.model} - ${os.vehicle.plate}`
-                          : "N/A"}
+                      <TableCell className="font-medium">
+                        {getClientName(os)}
                       </TableCell>
                       <TableCell>
                         {new Date(os.createdAt).toLocaleDateString("pt-BR")}
@@ -1263,6 +1330,29 @@ export default function ServiceOrderPage() {
         confirmText="Sim, Cancelar"
         variant="danger"
         isLoading={!!actionLoading}
+      />
+
+      <ConfirmModal
+        isOpen={isBlockedClientOpen}
+        onClose={onBlockedClientClose}
+        onConfirm={onBlockedClientClose}
+        title="Cliente bloqueado"
+        message={`O cliente ${getSelectedClientName()} esta bloqueado. Nao e possivel criar uma OS para este cliente.`}
+        confirmText="Entendi"
+        variant="danger"
+        hideCancel
+      />
+
+      <ConfirmModal
+        isOpen={isRestrictedClientOpen}
+        onClose={onRestrictedClientClose}
+        onConfirm={confirmCreateRestrictedClientOrder}
+        title="Cliente com restricoes"
+        message={`O cliente ${getSelectedClientName()} possui restricoes. Deseja continuar e criar a OS mesmo assim?`}
+        confirmText="Criar OS"
+        cancelText="Voltar"
+        variant="warning"
+        isLoading={actionLoading === "create"}
       />
     </AppLayout>
   );

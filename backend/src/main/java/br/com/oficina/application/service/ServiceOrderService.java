@@ -8,6 +8,7 @@ import br.com.oficina.domain.entities.Client;
 import br.com.oficina.domain.entities.FinancialTitle;
 import br.com.oficina.domain.entities.Mechanic;
 import br.com.oficina.domain.entities.ServiceOrder;
+import br.com.oficina.domain.enums.ClientSituation;
 import br.com.oficina.domain.enums.StatusOS;
 import br.com.oficina.domain.vo.FinancialTotals;
 import br.com.oficina.domain.vo.ItemOS;
@@ -15,6 +16,7 @@ import br.com.oficina.infrastructure.configuration.UserContext;
 import br.com.oficina.infrastructure.persistence.FinancialTitleRepository;
 import br.com.oficina.infrastructure.persistence.MechanicRepository;
 import br.com.oficina.infrastructure.persistence.ServiceOrderRepository;
+import br.com.oficina.shared.exceptions.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -64,7 +66,10 @@ public class ServiceOrderService {
 	public ServiceOrderResponseDTO create(ServiceOrderRequestDTO dto) {
 		UUID enterpriseId = userContext.getCurrentEnterpriseId();
 		
-		clientService.findById(UUID.fromString(dto.clientId()));
+		Client client = clientService.findById(UUID.fromString(dto.clientId()));
+		if (client.getSituation() == ClientSituation.BLOQUEADO) {
+			throw new BusinessException("Cliente bloqueado. Nao e possivel criar OS para este cliente.");
+		}
 
 		ServiceOrder newOS = new ServiceOrder();
 		newOS.setEnterpriseId(enterpriseId);
