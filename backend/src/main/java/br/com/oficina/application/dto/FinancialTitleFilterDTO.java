@@ -21,5 +21,7 @@ public record FinancialTitleFilterDTO(
 		LocalDate competenceDateStart,
 
 		@DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-		LocalDate competenceDateEnd
+		LocalDate competenceDateEnd,
+
+		SlipGenerationFilter slipGeneration
 ) {}

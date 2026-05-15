@@ -3,8 +3,10 @@ package br.com.oficina.infrastructure.api.financial;
 import br.com.oficina.application.dto.CreateTitleDTO;
 import br.com.oficina.application.dto.FinancialReportDTO;
 import br.com.oficina.application.dto.FinancialTitleFilterDTO;
+import br.com.oficina.application.dto.SlipGenerationFilter;
 import br.com.oficina.application.service.FinancialTitleService;
 import br.com.oficina.application.service.PdfService;
+import br.com.oficina.application.service.ServiceOrderService;
 import br.com.oficina.application.service.SlipsService;
 import br.com.oficina.domain.entities.FinancialTitle;
 import br.com.oficina.domain.enums.FinancialTitleStatus;
@@ -37,6 +39,7 @@ import java.util.UUID;
 public class FinancialTitleController {
 
     private final FinancialTitleService financialTitleService;
+	private final ServiceOrderService serviceOrderService;
 	private final SlipsService slipsService;
 	private final PdfService pdfService;
 	private final ImageUtils imageUtils;
@@ -61,7 +64,13 @@ public class FinancialTitleController {
 		newTitle.setPaymentMethod(PaymentMethod.BANK_SLIP);
 		
 		if (dto.osId() != null && !dto.osId().isEmpty()) {
-			newTitle.setOsId(String.join(", ", dto.osId()));
+			newTitle.setOsId(dto.osId().stream()
+					.map(this::resolveOsNumber)
+					.collect(java.util.stream.Collectors.joining(", ")));
+			newTitle.setServiceOrderIds(dto.osId().stream()
+					.map(this::parseUuid)
+					.filter(java.util.Objects::nonNull)
+					.toList());
 		}
 
 		FinancialTitle savedTitle = financialTitleService.createManualTitle(newTitle);
@@ -78,12 +87,14 @@ public class FinancialTitleController {
 			@RequestParam(required = false) LocalDate dueDateEnd,
 			@RequestParam(required = false) LocalDate competenceDateStart,
 			@RequestParam(required = false) LocalDate competenceDateEnd,
+			@RequestParam(required = false, defaultValue = "ALL") SlipGenerationFilter slipGeneration,
 			@PageableDefault(size = 20, sort = "dueDate") Pageable pageable) {
 
 		FinancialTitleFilterDTO filter = new FinancialTitleFilterDTO(
 				type, status, description,
 				dueDateStart, dueDateEnd,
-				competenceDateStart, competenceDateEnd);
+				competenceDateStart, competenceDateEnd,
+				slipGeneration);
 
 		return ResponseEntity.ok(financialTitleService.listAll(filter, pageable));
 	}
@@ -154,4 +165,20 @@ public class FinancialTitleController {
 
     public record CreateTitleFromOSDTO(List<UUID> osIds) {}
     public record PaymentRequestDTO(BigDecimal paidValue, LocalDate paymentDate, boolean isPartialPayment) {}
+
+	private String resolveOsNumber(String osId) {
+		try {
+			return serviceOrderService.findById(UUID.fromString(osId)).osNumber();
+		} catch (Exception ignored) {
+			return osId;
+		}
+	}
+
+	private UUID parseUuid(String value) {
+		try {
+			return UUID.fromString(value);
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
 }

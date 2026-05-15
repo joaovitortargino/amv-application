@@ -19,6 +19,16 @@ public class ItauConfig {
 
     private String clientId;
     private String clientSecret;
+
+    private String environment = "SANDBOX";
+    private String authUrl;
+    private String apiUrl;
+    private String queryUrl;
+    private String scope;
+    private String sandboxToken;
+    private String beneficiaryId;
+    private String walletCode = "109";
+    private String boletoProcessStage = "efetivacao";
     
     // Armazena o arquivo .pfx em binário
     private byte[] certificateData;

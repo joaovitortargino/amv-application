@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -38,6 +39,7 @@ public class FinancialTitle {
 	// Vinculos
 	private UUID clientId; // ID do cliente (se houver) - Changed to String to match usage in service
 	private String osId; // ID da OS (se houver)
+	private List<UUID> serviceOrderIds;
 	private UUID relatedEntityId; // ID genérico de quem gerou (OS, Cliente, Fornecedor)
 	private String slipId; // ID do boleto gerado (se houver)
 	

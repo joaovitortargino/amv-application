@@ -22,6 +22,8 @@ import {
   X,
   Save,
   Receipt,
+  Printer,
+  RefreshCw,
 } from "lucide-react";
 import { FinancialTitleDTO } from "@/types";
 
@@ -34,6 +36,8 @@ interface FinancialTitleDetailsModalProps {
   onCancel: (id: string) => void;
   onUpdate: (id: string, data: Partial<FinancialTitleDTO>) => void;
   onGenerateSlip: (id: string) => void;
+  onPrintSlip: (id: string) => void;
+  onSyncSlip: (title: FinancialTitleDTO) => void;
   isLoading?: boolean;
 }
 
@@ -46,6 +50,8 @@ export function FinancialTitleDetailsModal({
   onCancel,
   onUpdate,
   onGenerateSlip,
+  onPrintSlip,
+  onSyncSlip,
   isLoading = false,
 }: FinancialTitleDetailsModalProps) {
   const [editMode, setEditMode] = useState(false);
@@ -58,6 +64,7 @@ export function FinancialTitleDetailsModal({
   });
 
   if (!title) return null;
+  const currentTitle = title;
 
   const statusColor = {
     OPEN: "warning",
@@ -75,17 +82,17 @@ export function FinancialTitleDetailsModal({
 
   function handleEditClick() {
     setEditData({
-      description: title.description,
-      category: title.category,
-      originalValue: String(title.originalValue),
-      dueDate: title.dueDate,
+      description: currentTitle.description,
+      category: currentTitle.category,
+      originalValue: String(currentTitle.originalValue),
+      dueDate: currentTitle.dueDate,
       paymentMethod: "BANK_SLIP",
     });
     setEditMode(true);
   }
 
   function handleSaveEdit() {
-    onUpdate(title.id, {
+    onUpdate(currentTitle.id, {
       description: editData.description,
       category: editData.category,
       originalValue: parseFloat(editData.originalValue),
@@ -209,6 +216,27 @@ export function FinancialTitleDetailsModal({
                 </div>
               </div>
               <Divider />
+              {(title.osId || title.slipId) && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">OS vinculadas</p>
+                      <p className="font-medium">{title.osId || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Boleto</p>
+                      <Chip
+                        size="sm"
+                        color={title.slipId ? "success" : "default"}
+                        variant="flat"
+                      >
+                        {title.slipId ? "Gerado" : "Nao gerado"}
+                      </Chip>
+                    </div>
+                  </div>
+                  <Divider />
+                </>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Data de Vencimento</p>
@@ -256,7 +284,7 @@ export function FinancialTitleDetailsModal({
           ) : (
             <>
               <div className="flex gap-2">
-                {title.status === "OPEN" || title.status === "DELAYED" && (
+                {(title.status === "OPEN" || title.status === "DELAYED") && (
                   <>
                     <Button
                       color="success"
@@ -266,15 +294,38 @@ export function FinancialTitleDetailsModal({
                     >
                       Pagar
                     </Button>
-                    <Button
-                      color="warning"
-                      variant="flat"
-                      startContent={<Receipt size={16} />}
-                      onClick={() => onGenerateSlip(title.id)}
-                      isLoading={isLoading}
-                    >
-                      Gerar Boleto
-                    </Button>
+                    {title.slipId ? (
+                      <>
+                        <Button
+                          color="warning"
+                          variant="flat"
+                          startContent={<Printer size={16} />}
+                          onClick={() => onPrintSlip(title.slipId!)}
+                          isLoading={isLoading}
+                        >
+                          Imprimir Boleto
+                        </Button>
+                        <Button
+                          color="primary"
+                          variant="flat"
+                          startContent={<RefreshCw size={16} />}
+                          onClick={() => onSyncSlip(title)}
+                          isLoading={isLoading}
+                        >
+                          Consultar Itaú
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        color="warning"
+                        variant="flat"
+                        startContent={<Receipt size={16} />}
+                        onClick={() => onGenerateSlip(title.id)}
+                        isLoading={isLoading}
+                      >
+                        Gerar Boleto
+                      </Button>
+                    )}
                   </>
                 )}
 
@@ -288,6 +339,31 @@ export function FinancialTitleDetailsModal({
                     Estornar
                   </Button>
                 )}
+
+                {title.slipId &&
+                  title.status !== "OPEN" &&
+                  title.status !== "DELAYED" && (
+                    <>
+                      <Button
+                        color="warning"
+                        variant="flat"
+                        startContent={<Printer size={16} />}
+                        onClick={() => onPrintSlip(title.slipId!)}
+                        isLoading={isLoading}
+                      >
+                        Imprimir Boleto
+                      </Button>
+                      <Button
+                        color="primary"
+                        variant="flat"
+                        startContent={<RefreshCw size={16} />}
+                        onClick={() => onSyncSlip(title)}
+                        isLoading={isLoading}
+                      >
+                        Consultar Itaú
+                      </Button>
+                    </>
+                  )}
               </div>
 
               <div className="flex gap-2">

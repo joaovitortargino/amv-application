@@ -45,6 +45,16 @@ export default function LoginPage() {
 
   const toggleVisibility = () => setShowPassword(!showPassword);
 
+  useEffect(() => {
+    if (sessionStorage.getItem("sessionExpired") === "true") {
+      sessionStorage.removeItem("sessionExpired");
+      addToast({
+        title: "Sessão expirada. Faça login novamente.",
+        color: "warning",
+      });
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-yellow-500/40 to-black flex items-center justify-center p-6">
       <div className="relative bg-white/95 backdrop-blur rounded-3xl shadow-2xl w-full max-w-md p-10">

@@ -29,16 +29,37 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       loadUser();
     } else {
+      redirectToLoginIfProtectedRoute();
       setLoading(false);
     }
+
+    const interval = window.setInterval(async () => {
+      if (apiService.getToken()) {
+        const validSession = await apiService.ensureValidToken();
+        if (!validSession) {
+          setUser(null);
+        }
+      }
+    }, 30000);
+
+    return () => window.clearInterval(interval);
   }, []);
+
+  const redirectToLoginIfProtectedRoute = () => {
+    if (typeof window === "undefined") return;
+
+    const publicRoutes = ["/", "/login", "/register"];
+    if (!publicRoutes.includes(window.location.pathname)) {
+      window.location.replace("/login");
+    }
+  };
 
   const loadUser = async () => {
     try {
       const userData = await apiService.get<User>("settings/user");
       setUser(userData);
     } catch (error) {
-      apiService.clearTokens();
+      apiService.expireSession();
     } finally {
       setLoading(false);
     }

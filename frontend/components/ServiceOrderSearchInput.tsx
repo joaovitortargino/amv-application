@@ -50,10 +50,12 @@ export function ServiceOrderSearchInput({
         const res = await apiService.get<ServiceOrderDTO[]>(
           `service-orders/client/${clientId}`,
         );
+        const selectableStatuses = ["OPEN", "IN_PROGRESS", "FINISHED"];
         const filtered = res.filter(
           (os) =>
-            os.osNumber.toLowerCase().includes(search.toLowerCase()) &&
-            os.status === "FINISHED" &&
+            (os.osNumber || "").toLowerCase().includes(search.toLowerCase()) &&
+            selectableStatuses.includes(os.status) &&
+            !(os.slips && os.slips.length > 0) &&
             !selectedOrders.some((sel) => sel.id === os.id),
         );
         setOrders(filtered);

@@ -3,6 +3,7 @@ package br.com.oficina.application.service;
 import br.com.oficina.application.dto.FinancialReportDTO;
 import br.com.oficina.application.dto.FinancialTitleFilterDTO;
 import br.com.oficina.application.dto.ServiceOrderResponseDTO;
+import br.com.oficina.application.dto.SlipGenerationFilter;
 import br.com.oficina.domain.entities.Client;
 import br.com.oficina.domain.entities.FinancialTitle;
 import br.com.oficina.domain.enums.FinancialTitleStatus;
@@ -14,9 +15,14 @@ import br.com.oficina.shared.exceptions.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,6 +39,7 @@ public class FinancialTitleService {
 	private final ServiceOrderService serviceOrderService;
 	private final ClientService clientService;
 	private final AuditService auditService;
+	private final MongoTemplate mongoTemplate;
 
 	@Transactional
 	public FinancialTitle createTitleFromServiceOrders(List<UUID> osIds) {
@@ -73,6 +80,7 @@ public class FinancialTitleService {
 		
 		String osNumbers = orders.stream().map(ServiceOrderResponseDTO::osNumber).collect(Collectors.joining(", "));
 		title.setOsId(osNumbers);
+		title.setServiceOrderIds(osIds);
 		
 		initializeValues(title);
 		FinancialTitle savedTitle = repository.save(title);
@@ -104,47 +112,51 @@ public class FinancialTitleService {
 	
 	public Page<FinancialTitle> listAll(FinancialTitleFilterDTO filter, Pageable pageable) {
 		UUID enterpriseId = userContext.getCurrentEnterpriseId();
-		Page<FinancialTitle> page;
+		Criteria criteria = buildCriteria(enterpriseId, filter);
+		Query query = new Query(criteria).with(pageable);
+		Query countQuery = new Query(criteria);
 
-		if (filter.description() != null && !filter.description().isBlank()) {
-			page = repository.searchByDescription(filter.description(), enterpriseId, pageable);
-		} else {
-			boolean hasType = filter.type() != null;
-			boolean hasStatus = filter.status() != null;
-			boolean hasDueDate = filter.dueDateStart() != null && filter.dueDateEnd() != null;
-			boolean hasCompetence = filter.competenceDateStart() != null && filter.competenceDateEnd() != null;
-
-			if (hasCompetence && !hasType && hasStatus) {
-				page = repository.findByEnterpriseIdAndCompetenceDateBetween(
-						enterpriseId, filter.competenceDateStart(), filter.competenceDateEnd(), pageable);
-			} else if (hasType && hasStatus && hasDueDate) {
-				page = repository.findByEnterpriseIdAndTypeAndStatusAndDueDateBetween(
-						enterpriseId, filter.type(), filter.status(),
-						filter.dueDateStart(), filter.dueDateEnd(), pageable);
-			} else if (hasType && hasDueDate) {
-				page = repository.findByEnterpriseIdAndTypeAndDueDateBetween(
-						enterpriseId, filter.type(), filter.dueDateStart(), filter.dueDateEnd(), pageable);
-			} else if (hasStatus && hasDueDate) {
-				page = repository.findByEnterpriseIdAndStatusAndDueDateBetween(
-						enterpriseId, filter.status(), filter.dueDateStart(), filter.dueDateEnd(), pageable);
-			} else if (hasDueDate) {
-				page = repository.findByEnterpriseIdAndDueDateBetweenInclusive(
-						enterpriseId, filter.dueDateStart(), filter.dueDateEnd(), pageable);
-			} else if (hasType && hasStatus) {
-				page = repository.findByEnterpriseIdAndTypeAndStatus(
-						enterpriseId, filter.type(), filter.status(), pageable);
-			} else if (hasType) {
-				page = repository.findByEnterpriseIdAndType(enterpriseId, filter.type(), pageable);
-			} else if (hasStatus) {
-				page = repository.findByEnterpriseIdAndStatus(enterpriseId, filter.status(), pageable);
-			} else {
-				page = repository.findByEnterpriseId(enterpriseId, pageable);
-			}
-		}
+		List<FinancialTitle> titles = mongoTemplate.find(query, FinancialTitle.class);
+		long total = mongoTemplate.count(countQuery, FinancialTitle.class);
+		Page<FinancialTitle> page = new PageImpl<>(titles, pageable, total);
 		
 		// Verifica atrasos antes de retornar
 		page.forEach(this::checkAndUpdateDelay);
 		return page;
+	}
+
+	private Criteria buildCriteria(UUID enterpriseId, FinancialTitleFilterDTO filter) {
+		List<Criteria> criteria = new java.util.ArrayList<>();
+		criteria.add(Criteria.where("enterpriseId").is(enterpriseId));
+
+		if (StringUtils.hasText(filter.description())) {
+			criteria.add(Criteria.where("description").regex(filter.description(), "i"));
+		}
+		if (filter.type() != null) {
+			criteria.add(Criteria.where("type").is(filter.type()));
+		}
+		if (filter.status() != null) {
+			criteria.add(Criteria.where("status").is(filter.status()));
+		}
+		if (filter.dueDateStart() != null && filter.dueDateEnd() != null) {
+			criteria.add(Criteria.where("dueDate").gte(filter.dueDateStart()).lte(filter.dueDateEnd()));
+		}
+		if (filter.competenceDateStart() != null && filter.competenceDateEnd() != null) {
+			criteria.add(Criteria.where("competenceDate").gte(filter.competenceDateStart()).lte(filter.competenceDateEnd()));
+		}
+
+		SlipGenerationFilter slipGeneration = filter.slipGeneration() == null ? SlipGenerationFilter.ALL : filter.slipGeneration();
+		if (slipGeneration == SlipGenerationFilter.GENERATED) {
+			criteria.add(Criteria.where("slipId").exists(true).nin(null, ""));
+		} else if (slipGeneration == SlipGenerationFilter.NOT_GENERATED) {
+			criteria.add(new Criteria().orOperator(
+					Criteria.where("slipId").exists(false),
+					Criteria.where("slipId").is(null),
+					Criteria.where("slipId").is("")
+			));
+		}
+
+		return new Criteria().andOperator(criteria.toArray(new Criteria[0]));
 	}
 
 	public List<FinancialTitle> findAllOpenPayables() {

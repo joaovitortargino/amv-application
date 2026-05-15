@@ -16,6 +16,7 @@ import br.com.oficina.infrastructure.configuration.UserContext;
 import br.com.oficina.infrastructure.persistence.FinancialTitleRepository;
 import br.com.oficina.infrastructure.persistence.MechanicRepository;
 import br.com.oficina.infrastructure.persistence.ServiceOrderRepository;
+import br.com.oficina.infrastructure.persistence.SlipsRepository;
 import br.com.oficina.shared.exceptions.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
@@ -27,7 +28,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,6 +44,7 @@ public class ServiceOrderService {
 	private final FinancialTitleRepository financialTitleRepository;
 	private final FinancialTitleService financialTitleService;
 	private final MechanicRepository mechanicRepository;
+	private final SlipsRepository slipsRepository;
 
 	public ServiceOrderService(
 			ServiceOrderRepository repository,
@@ -50,7 +54,8 @@ public class ServiceOrderService {
 			AuditService auditService,
 			FinancialTitleRepository financialTitleRepository,
 			@Lazy FinancialTitleService financialTitleService, // Injeção Lazy para quebrar o ciclo
-			MechanicRepository mechanicRepository
+			MechanicRepository mechanicRepository,
+			SlipsRepository slipsRepository
 	) {
 		this.repository = repository;
 		this.commissionService = commissionService;
@@ -60,6 +65,7 @@ public class ServiceOrderService {
 		this.financialTitleRepository = financialTitleRepository;
 		this.financialTitleService = financialTitleService;
 		this.mechanicRepository = mechanicRepository;
+		this.slipsRepository = slipsRepository;
 	}
 
 	@Transactional
@@ -319,9 +325,24 @@ public class ServiceOrderService {
 	
 	private ServiceOrderResponseDTO toResponseDTO(ServiceOrder os) {
 		FinancialTitle financialTitle = null;
+		Map<UUID, br.com.oficina.domain.entities.Slips> slipsById = new LinkedHashMap<>();
 		if (os.getFinancialTitleId() != null) {
 			financialTitle = financialTitleRepository.findById(os.getFinancialTitleId()).orElse(null);
+			slipsRepository.findByEnterpriseIdAndSourceId(os.getEnterpriseId(), os.getFinancialTitleId())
+					.forEach(slip -> slipsById.put(slip.getId(), slip));
 		}
+		if (os.getSlipsId() != null && !os.getSlipsId().isEmpty()) {
+			List<UUID> slipIds = os.getSlipsId().stream()
+					.map(this::parseUuid)
+					.filter(java.util.Objects::nonNull)
+					.toList();
+			slipsRepository.findAllById(slipIds).forEach(slip -> {
+				if (os.getEnterpriseId().equals(slip.getEnterpriseId())) {
+					slipsById.put(slip.getId(), slip);
+				}
+			});
+		}
+		List<br.com.oficina.domain.entities.Slips> slips = new ArrayList<>(slipsById.values());
 
 		Client client = null;
 		if (os.getClientId() != null) {
@@ -345,7 +366,16 @@ public class ServiceOrderService {
 				os.getForecastDate(),
 				os.getCompletionDate(),
 				os.getObservations(),
-				financialTitle
+				financialTitle,
+				slips
 		);
+	}
+
+	private UUID parseUuid(String value) {
+		try {
+			return UUID.fromString(value);
+		} catch (Exception ignored) {
+			return null;
+		}
 	}
 }

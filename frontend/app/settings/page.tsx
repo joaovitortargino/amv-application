@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import { apiService } from "@/services/api";
 import { AppLayout } from "@/components/AppLayout";
 import { motion } from "framer-motion";
-import { Button, Input, Spinner, addToast, Chip } from "@heroui/react";
+import {
+  Button,
+  Input,
+  Spinner,
+  addToast,
+  Chip,
+  Select,
+  SelectItem,
+} from "@heroui/react";
 import {
   Building2,
   Mail,
@@ -20,12 +28,22 @@ import {
   EyeOff,
   CheckCircle,
   AlertCircle,
+  ServerCog,
 } from "lucide-react";
 import { Enterprise } from "@/types";
 
 interface ItauConfigResponse {
   clientId: string;
-  clientSecret: string;
+  hasClientSecret: boolean;
+  environment: string;
+  beneficiaryId: string;
+  walletCode: string;
+  boletoProcessStage: string;
+  authUrl?: string;
+  apiUrl?: string;
+  queryUrl?: string;
+  scope?: string;
+  hasSandboxToken: boolean;
   active: boolean;
   hasCertificate: boolean;
 }
@@ -246,19 +264,37 @@ function ItauSettings() {
 
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
+  const [environment, setEnvironment] = useState("SANDBOX");
+  const [beneficiaryId, setBeneficiaryId] = useState("");
+  const [walletCode, setWalletCode] = useState("109");
+  const [boletoProcessStage, setBoletoProcessStage] = useState("efetivacao");
+  const [authUrl, setAuthUrl] = useState("");
+  const [apiUrl, setApiUrl] = useState("");
+  const [queryUrl, setQueryUrl] = useState("");
+  const [scope, setScope] = useState("");
+  const [sandboxToken, setSandboxToken] = useState("");
   const [certPassword, setCertPassword] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
 
   const [showSecret, setShowSecret] = useState(false);
+  const [showSandboxToken, setShowSandboxToken] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     apiService
       .get<ItauConfigResponse>("settings/itau")
       .then((data) => {
+        if (!data) return;
         setCurrent(data);
         setClientId(data.clientId || "");
-        setClientSecret(data.clientSecret || "");
+        setEnvironment(data.environment || "SANDBOX");
+        setBeneficiaryId(data.beneficiaryId || "");
+        setWalletCode(data.walletCode || "109");
+        setBoletoProcessStage(data.boletoProcessStage || "efetivacao");
+        setAuthUrl(data.authUrl || "");
+        setApiUrl(data.apiUrl || "");
+        setQueryUrl(data.queryUrl || "");
+        setScope(data.scope || "");
       })
       .catch((err) => {
         // 204 No Content = sem config ainda, não é erro
@@ -270,7 +306,7 @@ function ItauSettings() {
   }, []);
 
   async function handleSave() {
-    if (!clientId || !clientSecret) {
+    if (!clientId || (!clientSecret && !current?.hasClientSecret)) {
       addToast({
         title: "Client ID e Client Secret são obrigatórios",
         color: "warning",
@@ -278,7 +314,27 @@ function ItauSettings() {
       return;
     }
 
-    if (!current?.hasCertificate && !certFile) {
+    if (!beneficiaryId) {
+      addToast({
+        title: "Informe o ID do beneficiario",
+        color: "warning",
+      });
+      return;
+    }
+
+    if (
+      environment === "SANDBOX" &&
+      !sandboxToken &&
+      !current?.hasSandboxToken
+    ) {
+      addToast({
+        title: "Informe o Sandbox Token do Itau",
+        color: "warning",
+      });
+      return;
+    }
+
+    if (environment === "PRODUCTION" && !current?.hasCertificate && !certFile) {
       addToast({
         title: "Envie um certificado .p12 para configurar a integração",
         color: "warning",
@@ -298,21 +354,33 @@ function ItauSettings() {
     try {
       const formData = new FormData();
       formData.append("clientId", clientId);
-      formData.append("clientSecret", clientSecret);
-      formData.append("certificatePassword", certPassword);
+      if (clientSecret) formData.append("clientSecret", clientSecret);
+      formData.append("environment", environment);
+      formData.append("beneficiaryId", beneficiaryId);
+      formData.append("walletCode", walletCode);
+      formData.append("boletoProcessStage", boletoProcessStage);
+      formData.append("authUrl", authUrl);
+      formData.append("apiUrl", apiUrl);
+      formData.append("queryUrl", queryUrl);
+      formData.append("scope", scope);
+      if (sandboxToken) formData.append("sandboxToken", sandboxToken);
+      if (certPassword) formData.append("certificatePassword", certPassword);
       if (certFile) formData.append("certificate", certFile);
 
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token") || "";
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      const authHeaders = await apiService.getAuthHeaders();
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
       const res = await fetch(`${baseUrl}/settings/itau`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
         body: formData,
       });
 
-      if (!res.ok) throw new Error("Erro ao salvar");
+      if (apiService.handleUnauthorizedResponse(res)) return;
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(error?.message || "Erro ao salvar");
+      }
 
       addToast({
         title: "Integração Itaú configurada com sucesso!",
@@ -321,6 +389,8 @@ function ItauSettings() {
 
       const updated = await apiService.get<ItauConfigResponse>("settings/itau");
       setCurrent(updated);
+      setClientSecret("");
+      setSandboxToken("");
       setCertFile(null);
       setCertPassword("");
     } catch (error: any) {
@@ -347,7 +417,7 @@ function ItauSettings() {
         description="Situação atual da conexão com o Itaú"
         icon={CreditCard}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <StatusCard
             label="Integração"
             active={current?.active ?? false}
@@ -362,10 +432,120 @@ function ItauSettings() {
           />
           <StatusCard
             label="Credenciais"
-            active={!!current?.clientId}
+            active={!!current?.clientId && !!current?.hasClientSecret}
             activeText="Salvas"
             inactiveText="Não configuradas"
           />
+          <StatusCard
+            label="Sandbox Token"
+            active={environment !== "SANDBOX" || !!current?.hasSandboxToken}
+            activeText={environment === "SANDBOX" ? "Salvo" : "Nao usado"}
+            inactiveText="Nao configurado"
+          />
+          <StatusCard
+            label="Ambiente"
+            active={environment === "SANDBOX" || current?.active === true}
+            activeText={environment === "SANDBOX" ? "Sandbox" : "Producao"}
+            inactiveText="Nao definido"
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="Cash Management Ext V2"
+        description="Ambiente, beneficiario e endpoints da API de boletos"
+        icon={ServerCog}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Select
+            label="Ambiente"
+            selectedKeys={[environment]}
+            onSelectionChange={(keys) =>
+              setEnvironment(Array.from(keys)[0]?.toString() || "SANDBOX")
+            }
+          >
+            <SelectItem key="SANDBOX">Sandbox</SelectItem>
+            <SelectItem key="PRODUCTION">Producao</SelectItem>
+          </Select>
+          <Select
+            label="Etapa do Boleto"
+            selectedKeys={[boletoProcessStage]}
+            onSelectionChange={(keys) =>
+              setBoletoProcessStage(
+                Array.from(keys)[0]?.toString() || "efetivacao",
+              )
+            }
+          >
+            <SelectItem key="efetivacao">Efetivacao</SelectItem>
+            <SelectItem key="validacao">Validacao</SelectItem>
+          </Select>
+          <Input
+            label="ID do Beneficiario"
+            placeholder="id_beneficiario"
+            value={beneficiaryId}
+            onChange={(e) => setBeneficiaryId(e.target.value)}
+            isRequired
+          />
+          <Input
+            label="Carteira"
+            placeholder="109"
+            value={walletCode}
+            onChange={(e) => setWalletCode(e.target.value)}
+            isRequired
+          />
+          <Input
+            label="URL Auth"
+            placeholder="Padrao do ambiente se vazio"
+            value={authUrl}
+            onChange={(e) => setAuthUrl(e.target.value)}
+            className="md:col-span-2"
+          />
+          <Input
+            label="URL Cash Management - Emissao"
+            placeholder="Padrao da API Cash Management se vazio"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+            className="md:col-span-2"
+          />
+          <Input
+            label="URL Cash Management - Consulta"
+            placeholder="Padrao da API Cash Management se vazio"
+            value={queryUrl}
+            onChange={(e) => setQueryUrl(e.target.value)}
+            className="md:col-span-2"
+          />
+          <Input
+            label="Scope OAuth"
+            placeholder="Opcional; deixe vazio se o Itau nao orientar"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            className="md:col-span-2"
+          />
+          {environment === "SANDBOX" && (
+            <Input
+              label="Sandbox Token"
+              placeholder={
+                current?.hasSandboxToken
+                  ? "Preencha apenas para trocar o token"
+                  : "Informe o x-sandbox-token do portal Itau"
+              }
+              value={sandboxToken}
+              onChange={(e) => setSandboxToken(e.target.value)}
+              type={showSandboxToken ? "text" : "password"}
+              className="md:col-span-2"
+              startContent={<ShieldCheck size={14} className="text-gray-400" />}
+              endContent={
+                <button
+                  type="button"
+                  onClick={() => setShowSandboxToken((v) => !v)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  {showSandboxToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              }
+              isRequired={!current?.hasSandboxToken}
+            />
+          )}
         </div>
       </Section>
 
@@ -385,7 +565,11 @@ function ItauSettings() {
           />
           <Input
             label="Client Secret"
-            placeholder="Informe o Client Secret"
+            placeholder={
+              current?.hasClientSecret
+                ? "Preencha apenas para trocar o secret"
+                : "Informe o Client Secret"
+            }
             value={clientSecret}
             onChange={(e) => setClientSecret(e.target.value)}
             type={showSecret ? "text" : "password"}
@@ -399,7 +583,7 @@ function ItauSettings() {
                 {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             }
-            isRequired
+            isRequired={!current?.hasClientSecret}
           />
         </div>
       </Section>
@@ -468,7 +652,7 @@ function ItauSettings() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               }
-              description="A senha não será armazenada em texto puro"
+              description="Necessaria apenas quando enviar ou trocar o certificado"
               isRequired={!!certFile}
             />
           )}

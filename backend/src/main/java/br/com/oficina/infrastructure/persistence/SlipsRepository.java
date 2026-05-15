@@ -18,6 +18,11 @@ public interface SlipsRepository extends MongoRepository<Slips, UUID> {
 
     Optional<Slips> findByOurNumber(String ourNumber);
 
+    List<Slips> findByEnterpriseIdAndSourceId(UUID enterpriseId, UUID sourceId);
+
+    @Query("{ 'enterpriseId': ?0, 'status': { $in: ?1 }, 'idBoletoIndividual': { $nin: [null, ''] } }")
+    List<Slips> findSynchronizableByEnterpriseId(UUID enterpriseId, List<SlipStatus> statuses);
+
     // Busca paginada e com filtros dinâmicos
     @Query("{ " +
             "  'enterpriseId': ?0, " +

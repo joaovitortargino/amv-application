@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { apiService } from "@/services/api";
 import {
   ClientDTO,
+  FinancialTitleDTO,
   PageResponse,
   ProductServiceDTO,
   ServiceOrderDTO,
   ServiceOrderItem,
   ServiceOrderRequestDTO,
+  SlipDTO,
 } from "@/types";
 import { AppLayout } from "@/components/AppLayout";
 import { ClientSearchInput } from "@/components/ClientSearchInput";
@@ -40,6 +42,7 @@ import {
   Select,
   SelectItem,
   Divider,
+  Checkbox,
 } from "@heroui/react";
 import {
   CheckCircle,
@@ -65,6 +68,10 @@ export default function ServiceOrderPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [printLoading, setPrintLoading] = useState<string | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
+  const [bulkSlipLoading, setBulkSlipLoading] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   const {
     isOpen: isExportOpen,
@@ -212,9 +219,15 @@ export default function ServiceOrderPage() {
         `service-orders?${params.toString()}`,
       );
       setData(res);
+      setSelectedOrderIds((prev) => {
+        const validIds = new Set(
+          res.filter((os) => prev.has(os.id) && isEligibleForBulkSlip(os)).map((os) => os.id),
+        );
+        return validIds;
+      });
 
       setTotals({
-        open: res.filter((os) => os.status === "OPEN").length,
+        open: res.filter((os) => os.status === "OPEN" || os.status === "IN_PROGRESS").length,
         finished: res.filter((os) => os.status === "FINISHED").length,
         canceled: res.filter((os) => os.status === "CANCELED").length,
       });
@@ -268,8 +281,7 @@ export default function ServiceOrderPage() {
     setExportLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+      const authHeaders = await apiService.getAuthHeaders();
 
       const params = new URLSearchParams({
         startDate: exportDates.from,
@@ -278,9 +290,10 @@ export default function ServiceOrderPage() {
       const response = await fetch(
         `${baseUrl}/service-orders/report?${params.toString()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: authHeaders,
         },
       );
+      if (apiService.handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) throw new Error("Erro ao gerar relatório");
 
@@ -309,13 +322,13 @@ export default function ServiceOrderPage() {
   async function handlePrint(osId: string, osNumber?: string) {
     setPrintLoading(osId);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const authHeaders = await apiService.getAuthHeaders();
 
       const response = await fetch(`${baseUrl}/service-orders/${osId}/print`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
+      if (apiService.handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) throw new Error("Erro ao gerar PDF");
 
@@ -340,6 +353,85 @@ export default function ServiceOrderPage() {
       });
     } finally {
       setPrintLoading(null);
+    }
+  }
+
+  function isEligibleForBulkSlip(os: ServiceOrderDTO) {
+    const isOpenForBilling = os.status === "OPEN" || os.status === "IN_PROGRESS";
+    const hasSlip = Boolean(os.slips && os.slips.length > 0);
+    const hasTitle = Boolean(os.financialTitle);
+    return isOpenForBilling && !hasSlip && !hasTitle;
+  }
+
+  function toggleOrderSelection(os: ServiceOrderDTO, selected: boolean) {
+    if (!isEligibleForBulkSlip(os)) return;
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (selected) {
+        next.add(os.id);
+      } else {
+        next.delete(os.id);
+      }
+      return next;
+    });
+  }
+
+  function togglePageSelection(selected: boolean) {
+    const eligibleIds = paginatedData
+      .filter(isEligibleForBulkSlip)
+      .map((os) => os.id);
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      eligibleIds.forEach((id) => {
+        if (selected) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      });
+      return next;
+    });
+  }
+
+  async function generateBulkSlip() {
+    const selectedOrders = data.filter((os) => selectedOrderIds.has(os.id));
+    if (selectedOrders.length === 0) {
+      addToast({
+        title: "Selecione ao menos uma OS em andamento",
+        color: "warning",
+      });
+      return;
+    }
+
+    const clients = new Set(selectedOrders.map((os) => os.clientId));
+    if (clients.size > 1) {
+      addToast({
+        title: "Selecione OS do mesmo cliente para gerar um boleto agrupado",
+        color: "warning",
+      });
+      return;
+    }
+
+    setBulkSlipLoading(true);
+    try {
+      const title = await apiService.post<FinancialTitleDTO>(
+        "financial-titles/from-os",
+        { osIds: selectedOrders.map((os) => os.id) },
+      );
+      await apiService.post<SlipDTO>(`slips/from-title/${title.id}`);
+      setSelectedOrderIds(new Set());
+      addToast({
+        title: "Boleto gerado para as OS selecionadas",
+        color: "success",
+      });
+      load();
+    } catch (error: any) {
+      addToast({
+        title: error?.message || "Erro ao gerar boleto em lote",
+        color: "danger",
+      });
+    } finally {
+      setBulkSlipLoading(false);
     }
   }
 
@@ -556,14 +648,28 @@ export default function ServiceOrderPage() {
     (page + 1) * itemsPerPage,
   );
 
+  const selectedOrdersForSlip = data.filter((os) => selectedOrderIds.has(os.id));
+  const selectedSlipTotal = selectedOrdersForSlip.reduce(
+    (sum, os) => sum + Number(os.totals?.total || 0),
+    0,
+  );
+  const eligiblePageOrders = paginatedData.filter(isEligibleForBulkSlip);
+  const selectedEligiblePageCount = eligiblePageOrders.filter((os) =>
+    selectedOrderIds.has(os.id),
+  ).length;
+
   const statusColor = {
     OPEN: "warning",
+    PENDING: "default",
+    IN_PROGRESS: "primary",
     FINISHED: "success",
     CANCELED: "danger",
   } as const;
 
   const statusLabel = {
     OPEN: "Em Andamento",
+    PENDING: "Pendente",
+    IN_PROGRESS: "Em Andamento",
     FINISHED: "Finalizada",
     CANCELED: "Cancelada",
   };
@@ -665,36 +771,85 @@ export default function ServiceOrderPage() {
               <div className="flex justify-between items-center mb-3">
                 <span className="text-sm text-gray-500">
                   {filteredData.length} registro(s) encontrado(s)
+                  {selectedOrdersForSlip.length > 0 && (
+                    <span className="ml-2 font-medium text-gray-700">
+                      {selectedOrdersForSlip.length} selecionada(s) -{" "}
+                      {selectedSlipTotal.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </span>
+                  )}
                 </span>
-                <Button
-                  color="warning"
-                  className="text-black"
-                  startContent={<FileDown size={16} />}
-                  onPress={() => {
-                    setExportDates({
-                      from: filters.from || today,
-                      to: filters.to || today,
-                    });
-                    onExportOpen();
-                  }}
-                >
-                  Exportar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    color="success"
+                    className="text-white"
+                    startContent={<FileText size={16} />}
+                    isLoading={bulkSlipLoading}
+                    isDisabled={selectedOrdersForSlip.length === 0}
+                    onPress={generateBulkSlip}
+                  >
+                    Gerar Boleto
+                  </Button>
+                  <Button
+                    color="warning"
+                    className="text-black"
+                    startContent={<FileDown size={16} />}
+                    onPress={() => {
+                      setExportDates({
+                        from: filters.from || today,
+                        to: filters.to || today,
+                      });
+                      onExportOpen();
+                    }}
+                  >
+                    Exportar
+                  </Button>
+                </div>
               </div>
 
               <Table className="text-white">
                 <TableHeader>
+                  <TableColumn>
+                    <Checkbox
+                      size="sm"
+                      aria-label="Selecionar OS elegiveis"
+                      isSelected={
+                        eligiblePageOrders.length > 0 &&
+                        selectedEligiblePageCount === eligiblePageOrders.length
+                      }
+                      isIndeterminate={
+                        selectedEligiblePageCount > 0 &&
+                        selectedEligiblePageCount < eligiblePageOrders.length
+                      }
+                      isDisabled={eligiblePageOrders.length === 0}
+                      onValueChange={togglePageSelection}
+                    />
+                  </TableColumn>
                   <TableColumn>Nº OS</TableColumn>
                   <TableColumn>Cliente</TableColumn>
                   <TableColumn>Criação</TableColumn>
                   <TableColumn>Total</TableColumn>
                   <TableColumn>Status</TableColumn>
+                  <TableColumn>Boleto</TableColumn>
                   <TableColumn>Ações</TableColumn>
                 </TableHeader>
 
                 <TableBody emptyContent="Nenhuma OS encontrada">
                   {paginatedData.map((os) => (
                     <TableRow key={os.id}>
+                      <TableCell>
+                        <Checkbox
+                          size="sm"
+                          aria-label={`Selecionar ${os.osNumber || "OS"}`}
+                          isSelected={selectedOrderIds.has(os.id)}
+                          isDisabled={!isEligibleForBulkSlip(os)}
+                          onValueChange={(selected) =>
+                            toggleOrderSelection(os, selected)
+                          }
+                        />
+                      </TableCell>
                       <TableCell className="font-semibold">
                         {os.osNumber}
                       </TableCell>
@@ -721,6 +876,17 @@ export default function ServiceOrderPage() {
                         >
                           {statusLabel[os.status as keyof typeof statusLabel] ||
                             os.status}
+                        </Chip>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          color={os.slips && os.slips.length > 0 ? "success" : "default"}
+                          variant="flat"
+                          size="sm"
+                        >
+                          {os.slips && os.slips.length > 0
+                            ? `${os.slips.length} gerado(s)`
+                            : "Nao gerado"}
                         </Chip>
                       </TableCell>
                       <TableCell>

@@ -1,6 +1,6 @@
 package br.com.oficina.infrastructure.integration.itau.dto;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -8,6 +8,7 @@ public record ItauErrorResponse(
     String codigo,
     String mensagem,
     String campo,
+    @JsonAlias({"campos", "errors"})
     List<ItauErrorDetail> erros
 ) {
     public record ItauErrorDetail(

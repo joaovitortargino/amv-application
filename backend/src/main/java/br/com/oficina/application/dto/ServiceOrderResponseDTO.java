@@ -2,6 +2,7 @@ package br.com.oficina.application.dto;
 
 import br.com.oficina.domain.entities.FinancialTitle;
 import br.com.oficina.domain.entities.Client;
+import br.com.oficina.domain.entities.Slips;
 import br.com.oficina.domain.enums.StatusOS;
 import br.com.oficina.domain.vo.FinancialTotals;
 import br.com.oficina.domain.vo.ItemOS;
@@ -23,5 +24,6 @@ public record ServiceOrderResponseDTO(
     LocalDateTime forecastDate,
     LocalDateTime completionDate,
     String observations,
-    FinancialTitle financialTitle // Novo campo
+    FinancialTitle financialTitle,
+    List<Slips> slips
 ) {}

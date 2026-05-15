@@ -8,6 +8,7 @@ import {
   ServiceOrderItem,
   PageResponse,
   MechanicDTO,
+  SlipDTO,
 } from "@/types";
 import {
   Modal,
@@ -66,6 +67,7 @@ export function ServiceOrderDetailsModal({
     [],
   );
   const [printLoading, setPrintLoading] = useState<string | null>(null);
+  const [slipPrintLoading, setSlipPrintLoading] = useState<string | null>(null);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [draftItem, setDraftItem] = useState<
     Partial<ServiceOrderItem> & { mechanicName?: string }
@@ -266,12 +268,12 @@ export function ServiceOrderDetailsModal({
     setPrintLoading(osId);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+      const authHeaders = await apiService.getAuthHeaders();
 
       const response = await fetch(`${baseUrl}/service-orders/${osId}/print`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders,
       });
+      if (apiService.handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) throw new Error("Erro ao gerar PDF");
 
@@ -297,7 +299,44 @@ export function ServiceOrderDetailsModal({
     }
   }
 
+  async function handlePrintSlip(slipId: string) {
+    setSlipPrintLoading(slipId);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const authHeaders = await apiService.getAuthHeaders();
+
+      const response = await fetch(`${baseUrl}/slips/${slipId}/print`, {
+        headers: authHeaders,
+      });
+      if (apiService.handleUnauthorizedResponse(response)) return;
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.message || "Erro ao gerar boleto");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (!win) {
+        addToast({
+          title: "Permita pop-ups no navegador para visualizar o boleto",
+          color: "warning",
+        });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error: any) {
+      addToast({
+        title: error?.message || "Erro ao imprimir boleto",
+        color: "danger",
+      });
+    } finally {
+      setSlipPrintLoading(null);
+    }
+  }
+
   const orderItems: any[] = orderDetails.items || orderDetails.itemOS || [];
+  const slips: SlipDTO[] = orderDetails.slips || [];
   const osNumberDisplay = orderDetails.osNumber || orderDetails.osNumber || "";
   const subtotal = orderDetails.totals?.subtotal || 0;
   const totalDescontos = orderDetails.totals?.descont || 0;
@@ -716,6 +755,75 @@ export function ServiceOrderDetailsModal({
                       : "R$ 0,00"}
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {slips.length > 0 && (
+            <div className="bg-green-900/10 p-5 rounded-xl border border-green-900/50 mt-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Receipt className="text-green-500" size={20} />
+                <h3 className="text-md font-semibold text-green-400">
+                  Boletos Gerados
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {slips.map((slip) => (
+                  <div
+                    key={slip.id}
+                    className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center rounded-lg border border-gray-800 p-3"
+                  >
+                    <div>
+                      <p className="text-xs text-gray-500">Nosso numero</p>
+                      <p className="text-white font-medium">
+                        {slip.ourNumber || "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Vencimento</p>
+                      <p className="text-white font-medium">
+                        {new Date(slip.dueDate + "T00:00:00").toLocaleDateString(
+                          "pt-BR",
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Valor</p>
+                      <p className="text-white font-medium">
+                        {Number(slip.value).toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Status</p>
+                      <Chip size="sm" color="success" variant="flat">
+                        {slip.status}
+                      </Chip>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        color="warning"
+                        className="text-black"
+                        startContent={<Printer size={16} />}
+                        isLoading={slipPrintLoading === slip.id}
+                        onPress={() => handlePrintSlip(slip.id)}
+                      >
+                        Imprimir
+                      </Button>
+                    </div>
+                    {slip.digitableLine && (
+                      <div className="md:col-span-5">
+                        <p className="text-xs text-gray-500">Linha digitavel</p>
+                        <p className="font-mono text-xs text-white break-all">
+                          {slip.digitableLine}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

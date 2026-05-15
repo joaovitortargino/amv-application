@@ -4,7 +4,7 @@ spring:
 
   data:
     mongodb:
-      uri: ${SPRING_DATA_MONGODB_URI}
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://admin:admin@localhost:27017/oficina_db?authSource=admin}
       auto-index-creation: true
 
   jackson:
@@ -13,16 +13,16 @@ spring:
 
 itau:
   ssl:
-    key-store: ""
-    key-store-password: ""
+    key-store: ${ITAU_SSL_KEY_STORE:}
+    key-store-password: ${ITAU_SSL_KEY_STORE_PASSWORD:}
   mtls:
-    enabled: false
-  #base path para sandbox
-  url-auth: https://sandbox.devportal.itau.com.br/api/oauth/jwt
-  url-api: https://sandbox.devportal.itau.com.br/itau-ep9-api-boleto-v1-externo/v1/boletos
-  mock-mode: false
-  client-id: "9ce309ff-49ce-38a0-a244-c4a413530c2d"
-  client-secret: "96f7ae67-06ed-486c-a69f-6118665bfb2c"
+    enabled: ${ITAU_MTLS_ENABLED:false}
+  url-auth: ${ITAU_URL_AUTH:https://devportal.itau.com.br/api/jwt}
+  url-api: ${ITAU_URL_API:https://devportal.itau.com.br/sandboxapi/cash_management_ext_v2/v2/boletos}
+  url-query: ${ITAU_URL_QUERY:https://devportal.itau.com.br/sandboxapi/cash_management_ext_v2/v2/boletos}
+  scope: ${ITAU_SCOPE:}
+  sandbox-token: ${ITAU_SANDBOX_TOKEN:}
+  mock-mode: ${ITAU_MOCK_MODE:false}
 
 
 api:

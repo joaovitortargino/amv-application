@@ -32,4 +32,6 @@ public interface ServiceOrderRepository extends MongoRepository <ServiceOrder, U
 	Optional<ServiceOrder> findByIdAndEnterpriseId(UUID id, UUID enterpriseId);
 
 	List<ServiceOrder> findByEnterpriseId(UUID enterpriseId);
+
+	List<ServiceOrder> findByEnterpriseIdAndFinancialTitleId(UUID enterpriseId, UUID financialTitleId);
 }

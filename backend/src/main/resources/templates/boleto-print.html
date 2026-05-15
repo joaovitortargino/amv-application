@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Boleto Itau</title>
+    <style type="text/css">
+        @page {
+            size: A4;
+            margin: 12mm;
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111827;
+            font-size: 11px;
+            margin: 0;
+        }
+
+        .top-line {
+            border-top: 1px dashed #777;
+            margin: 14px 0 10px;
+            height: 1px;
+        }
+
+        .bank-row {
+            display: table;
+            width: 100%;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }
+
+        .bank-cell {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
+        .bank-name {
+            font-size: 20px;
+            font-weight: bold;
+            width: 80px;
+        }
+
+        .bank-code {
+            border-left: 2px solid #111827;
+            border-right: 2px solid #111827;
+            width: 58px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .digitable-line {
+            text-align: right;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .grid {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .row {
+            display: table-row;
+        }
+
+        .field {
+            display: table-cell;
+            border: 1px solid #111827;
+            padding: 4px 6px;
+            vertical-align: top;
+        }
+
+        .label {
+            color: #555;
+            font-size: 9px;
+            margin-bottom: 3px;
+        }
+
+        .value {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .value-right {
+            text-align: right;
+        }
+
+        .w-25 { width: 25%; }
+        .w-33 { width: 33.33%; }
+        .w-50 { width: 50%; }
+        .w-75 { width: 75%; }
+
+        .section-title {
+            font-weight: bold;
+            font-size: 12px;
+            margin: 12px 0 6px;
+        }
+
+        .instructions {
+            border: 1px solid #111827;
+            min-height: 82px;
+            padding: 8px;
+            line-height: 1.45;
+        }
+
+        .barcode {
+            margin-top: 18px;
+            text-align: left;
+        }
+
+        .barcode img {
+            width: 100%;
+            max-height: 78px;
+        }
+
+        .barcode-number {
+            font-size: 10px;
+            margin-top: 4px;
+            letter-spacing: 1px;
+        }
+
+        .copy-label {
+            text-align: right;
+            color: #555;
+            font-size: 10px;
+            margin-bottom: 6px;
+        }
+
+        .muted {
+            color: #555;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="copy-label">Recibo do Pagador</div>
+    <div class="bank-row">
+        <div class="bank-cell bank-name">Itau</div>
+        <div class="bank-cell bank-code">341-7</div>
+        <div class="bank-cell digitable-line" th:text="${slip.digitableLine}">34191.00000 00000.000000 00000.000000 0 00000000000000</div>
+    </div>
+
+    <div class="grid">
+        <div class="row">
+            <div class="field w-75">
+                <div class="label">Beneficiario</div>
+                <div class="value" th:text="${enterprise.fantasyName ?: enterprise.corporateReason}">Empresa</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">CNPJ</div>
+                <div class="value" th:text="${enterprise.cnpj}">00.000.000/0000-00</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field w-25">
+                <div class="label">Data do documento</div>
+                <div class="value" th:text="${#temporals.format(slip.dateIssuance, 'dd/MM/yyyy')}">01/01/2026</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Nosso numero</div>
+                <div class="value" th:text="${slip.ourNumber}">00000000</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Vencimento</div>
+                <div class="value" th:text="${#temporals.format(slip.dueDate, 'dd/MM/yyyy')}">01/01/2026</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Valor do documento</div>
+                <div class="value value-right" th:text="${#numbers.formatCurrency(slip.value)}">R$ 0,00</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field w-75">
+                <div class="label">Pagador</div>
+                <div class="value" th:text="${slip.payerName}">Cliente</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">CPF/CNPJ</div>
+                <div class="value" th:text="${slip.payerDocument}">00000000000</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-title">Demonstrativo</div>
+    <div class="instructions">
+        <div th:if="${title != null}">
+            <strong th:text="${title.description}">Titulo financeiro</strong><br />
+            <span class="muted">Categoria: </span><span th:text="${title.category}">Servicos</span>
+        </div>
+        <div th:if="${orderNumbers != null and !orderNumbers.isEmpty()}">
+            <span class="muted">Ordens de servico vinculadas: </span>
+            <span th:each="orderNumber, iter : ${orderNumbers}">
+                <span th:text="${orderNumber}">OS-1</span><span th:if="${!iter.last}">, </span>
+            </span>
+        </div>
+        <div th:if="${slip.idBoletoIndividual != null}">
+            <span class="muted">ID boleto Itau: </span><span th:text="${slip.idBoletoIndividual}">id</span>
+        </div>
+    </div>
+
+    <div class="top-line"></div>
+
+    <div class="copy-label">Ficha de Compensacao</div>
+    <div class="bank-row">
+        <div class="bank-cell bank-name">Itau</div>
+        <div class="bank-cell bank-code">341-7</div>
+        <div class="bank-cell digitable-line" th:text="${slip.digitableLine}">34191.00000 00000.000000 00000.000000 0 00000000000000</div>
+    </div>
+
+    <div class="grid">
+        <div class="row">
+            <div class="field w-75">
+                <div class="label">Local de pagamento</div>
+                <div class="value">Pagavel em qualquer banco ate o vencimento.</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Vencimento</div>
+                <div class="value value-right" th:text="${#temporals.format(slip.dueDate, 'dd/MM/yyyy')}">01/01/2026</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field w-75">
+                <div class="label">Beneficiario</div>
+                <div class="value" th:text="${enterprise.corporateReason}">Empresa</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Valor do documento</div>
+                <div class="value value-right" th:text="${#numbers.formatCurrency(slip.value)}">R$ 0,00</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field w-25">
+                <div class="label">Nosso numero</div>
+                <div class="value" th:text="${slip.ourNumber}">00000000</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Carteira</div>
+                <div class="value" th:text="${itauConfig != null ? itauConfig.walletCode : '-'}">109</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Especie</div>
+                <div class="value">R$</div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Quantidade</div>
+                <div class="value">&#160;</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="field w-75">
+                <div class="label">Pagador</div>
+                <div class="value">
+                    <span th:text="${slip.payerName}">Cliente</span>
+                    <span class="muted"> - </span>
+                    <span th:text="${slip.payerDocument}">00000000000</span>
+                </div>
+            </div>
+            <div class="field w-25">
+                <div class="label">Autenticacao mecanica</div>
+                <div class="value">&#160;</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="barcode" th:if="${barcode != null}">
+        <img th:src="'data:image/png;base64,' + ${barcode}" alt="Codigo de barras" />
+        <div class="barcode-number" th:text="${formattedBarCode}">0000 0000</div>
+    </div>
+</body>
+</html>

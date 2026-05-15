@@ -191,6 +191,10 @@ export interface FinancialTitleDTO {
   dueDate: string;
   paymentDate?: string;
   status: FinancialStatus;
+  paymentMethod?: string;
+  clientId?: string;
+  osId?: string;
+  slipId?: string;
 }
 
 export interface FinancialFilterDTO {
@@ -199,6 +203,7 @@ export interface FinancialFilterDTO {
   type?: "INCOME" | "EXPENSE";
   from?: string;
   to?: string;
+  slipGeneration?: "ALL" | "GENERATED" | "NOT_GENERATED";
 }
 
 export interface PageResponse<T> {
@@ -208,20 +213,33 @@ export interface PageResponse<T> {
   number: number;
 }
 
-export type SlipStatus = "PENDING" | "PAID" | "CANCELED" | "OVERDUE";
+export type SlipStatus =
+  | "PENDING"
+  | "REGISTERED"
+  | "PAID"
+  | "CANCELED"
+  | "OVERDUE";
 
 export interface SlipDTO {
   id: string;
   payerName: string;
   payerDocument: string;
   value: number;
+  paidValue?: number;
   dueDate: string;
+  paymentDate?: string;
   dateIssuance: string;
   status: SlipStatus;
   barCode?: string;
   digitableLine?: string;
   idBoletoIndividual?: string;
   ourNumber: string;
+  itauStatus?: string;
+  itauDueStatus?: string;
+  lastItauSyncAt?: string;
+  lastItauSyncError?: string;
+  sourceId?: string;
+  sourceType?: "MANUAL" | "SERVICE_ORDER";
 }
 
 export interface ClientDTO {
@@ -291,7 +309,8 @@ export interface ServiceOrderDTO {
   observations?: string;
   items?: ServiceOrderItem[];
   itemOS?: ServiceOrderItem[];
-  financialTitle?: FinancialTitleDTO | null; 
+  financialTitle?: FinancialTitleDTO | null;
+  slips?: SlipDTO[];
 }
 
 export interface ServiceOrderRequestDTO {

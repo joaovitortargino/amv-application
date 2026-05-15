@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -25,6 +26,7 @@ public class Slips {
 	private String barCode; // Código de barras
 	
 	private BigDecimal value;
+	private BigDecimal paidValue;
 	private LocalDate dueDate;
 	private LocalDate paymentDate;
 	private LocalDate dateIssuance; // Data de emissão
@@ -37,4 +39,9 @@ public class Slips {
 	
 	private UUID sourceId; // Origem (ex: ID da OS, Título Financeiro)
 	private SlipSourceType sourceType; // OS, AVULSO, CONTRATO
+
+	private String itauStatus;
+	private String itauDueStatus;
+	private LocalDateTime lastItauSyncAt;
+	private String lastItauSyncError;
 }

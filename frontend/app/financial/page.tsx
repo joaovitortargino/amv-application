@@ -8,6 +8,7 @@ import {
   FinancialTitleDTO,
   PageResponse,
   ServiceOrderDTO,
+  SlipDTO,
 } from "@/types";
 import { AppLayout } from "@/components/AppLayout";
 import { ClientSearchInput } from "@/components/ClientSearchInput";
@@ -54,6 +55,8 @@ import {
   Ban,
   Calendar,
   FileText,
+  Printer,
+  RefreshCw,
 } from "lucide-react";
 import { FinancialTitleDetailsModal } from "@/components/FinancialTitleDetailsModal";
 import { ConfirmModal } from "@/components/ConfirmModal";
@@ -87,6 +90,7 @@ export default function FinancialPage() {
     type: undefined,
     from: today,
     to: today,
+    slipGeneration: "ALL",
   });
 
   const [exportDates, setExportDates] = useState({
@@ -140,6 +144,11 @@ export default function FinancialPage() {
     onOpen: onCreateOpen,
     onClose: onCreateClose,
   } = useDisclosure();
+  const {
+    isOpen: isSlipResultOpen,
+    onOpen: onSlipResultOpen,
+    onClose: onSlipResultClose,
+  } = useDisclosure();
 
   const [newTitle, setNewTitle] = useState({
     description: "",
@@ -155,6 +164,21 @@ export default function FinancialPage() {
   const [selectedOrders, setSelectedOrders] = useState<ServiceOrderDTO[]>([]);
   const [selectedTitleForDetails, setSelectedTitleForDetails] =
     useState<FinancialTitleDTO | null>(null);
+  const [generatedSlip, setGeneratedSlip] = useState<SlipDTO | null>(null);
+
+  function getOrderTotal(order: ServiceOrderDTO) {
+    return Number(order.totals?.total || 0);
+  }
+
+  function updateSelectedOrders(nextOrders: ServiceOrderDTO[]) {
+    const total = nextOrders.reduce((sum, order) => sum + getOrderTotal(order), 0);
+    setSelectedOrders(nextOrders);
+    setNewTitle((prev) => ({
+      ...prev,
+      osIds: nextOrders.map((order) => order.id),
+      originalValue: nextOrders.length > 0 ? total.toFixed(2) : prev.originalValue,
+    }));
+  }
 
   function buildQueryString(currentPage: number) {
     const params = new URLSearchParams();
@@ -164,6 +188,9 @@ export default function FinancialPage() {
     if (filters.text) params.set("description", filters.text);
     if (filters.status) params.set("status", filters.status);
     if (filters.type) params.set("type", filters.type);
+    if (filters.slipGeneration && filters.slipGeneration !== "ALL") {
+      params.set("slipGeneration", filters.slipGeneration);
+    }
     if (filters.from) params.set("dueDateStart", filters.from);
     if (filters.to) params.set("dueDateEnd", filters.to);
 
@@ -245,8 +272,7 @@ export default function FinancialPage() {
     setExportLoading(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+      const authHeaders = await apiService.getAuthHeaders();
 
       const params = new URLSearchParams({
         startDate: exportDates.from,
@@ -255,8 +281,9 @@ export default function FinancialPage() {
 
       const response = await fetch(
         `${baseUrl}/financial-titles/report?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: authHeaders },
       );
+      if (apiService.handleUnauthorizedResponse(response)) return;
 
       if (!response.ok) throw new Error("Erro ao gerar relatório");
 
@@ -282,6 +309,78 @@ export default function FinancialPage() {
       });
     } finally {
       setExportLoading(false);
+    }
+  }
+
+  async function printSlip(slipId: string) {
+    setActionLoading(slipId);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const authHeaders = await apiService.getAuthHeaders();
+
+      const response = await fetch(`${baseUrl}/slips/${slipId}/print`, {
+        headers: authHeaders,
+      });
+      if (apiService.handleUnauthorizedResponse(response)) return;
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.message || "Erro ao gerar boleto para impressao");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (!win) {
+        addToast({
+          title: "Permita pop-ups para visualizar o boleto",
+          color: "warning",
+        });
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error: any) {
+      addToast({
+        title: error?.message || "Erro ao imprimir boleto",
+        color: "danger",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function syncSlipStatus(title: FinancialTitleDTO) {
+    if (!title.slipId) return;
+    setActionLoading(`sync-${title.slipId}`);
+    try {
+      const slip = await apiService.post<SlipDTO>(
+        `slips/${title.slipId}/sync-itau`,
+      );
+
+      const statusText = slip.itauStatus || slip.status;
+      addToast({
+        title:
+          slip.status === "PAID"
+            ? "Boleto confirmado como pago pelo Itaú"
+            : `Consulta Itaú concluída: ${statusText}`,
+        color: slip.status === "PAID" ? "success" : "primary",
+      });
+
+      await load(page);
+      await loadTotals();
+
+      if (selectedTitleForDetails?.id === title.id) {
+        const updatedTitle = await apiService.get<FinancialTitleDTO>(
+          `financial-titles/${title.id}`,
+        );
+        setSelectedTitleForDetails(updatedTitle);
+      }
+    } catch (error: any) {
+      addToast({
+        title: error?.message || "Erro ao consultar boleto no Itaú",
+        color: "danger",
+      });
+    } finally {
+      setActionLoading(null);
     }
   }
 
@@ -398,9 +497,13 @@ export default function FinancialPage() {
     if (!pendingActionId) return;
     setActionLoading(pendingActionId);
     try {
-      await apiService.post(`slips/from-title/${pendingActionId}`);
+      const slip = await apiService.post<SlipDTO>(
+        `slips/from-title/${pendingActionId}`,
+      );
       onSlipConfirmClose();
-      addToast({ title: "Boleto gerado com sucesso!", color: "success" });
+      setGeneratedSlip(slip);
+      onSlipResultOpen();
+      addToast({ title: "Boleto registrado no Itau com sucesso!", color: "success" });
       load(page);
     } catch (error: any) {
       addToast({
@@ -523,7 +626,7 @@ export default function FinancialPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow p-4 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <Input
               className="mt-4"
               placeholder="Buscar descrição"
@@ -559,6 +662,22 @@ export default function FinancialPage() {
               <SelectItem key="EXPENSE">Despesa</SelectItem>
             </Select>
 
+            <Select
+              placeholder="Boleto"
+              selectedKeys={[filters.slipGeneration || "ALL"]}
+              onSelectionChange={(k) => {
+                const val = Array.from(k)[0] as
+                  | "ALL"
+                  | "GENERATED"
+                  | "NOT_GENERATED";
+                setFilters({ ...filters, slipGeneration: val || "ALL" });
+              }}
+            >
+              <SelectItem key="ALL">Todos</SelectItem>
+              <SelectItem key="GENERATED">Gerados</SelectItem>
+              <SelectItem key="NOT_GENERATED">Nao gerados</SelectItem>
+            </Select>
+
             <Input
               type="date"
               label="Vencimento de"
@@ -587,6 +706,7 @@ export default function FinancialPage() {
                   type: undefined,
                   from: undefined,
                   to: undefined,
+                  slipGeneration: "ALL",
                 });
                 setTimeout(() => {
                   setPage(0);
@@ -637,10 +757,12 @@ export default function FinancialPage() {
                 <TableHeader>
                   <TableColumn>Descrição</TableColumn>
                   <TableColumn>Categoria</TableColumn>
+                  <TableColumn>OS</TableColumn>
                   <TableColumn>Tipo</TableColumn>
                   <TableColumn>Vencimento</TableColumn>
                   <TableColumn>Valor Original</TableColumn>
                   <TableColumn>Status</TableColumn>
+                  <TableColumn>Boleto</TableColumn>
                   <TableColumn>Ações</TableColumn>
                 </TableHeader>
 
@@ -649,6 +771,13 @@ export default function FinancialPage() {
                     <TableRow key={t.id}>
                       <TableCell>{t.description}</TableCell>
                       <TableCell>{t.category}</TableCell>
+                      <TableCell>
+                        {t.osId ? (
+                          <span className="text-xs text-gray-500">{t.osId}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Chip
                           size="sm"
@@ -672,6 +801,15 @@ export default function FinancialPage() {
                       <TableCell>
                         <Chip color={statusColor[t.status]} variant="flat">
                           {statusLabel[t.status]}
+                        </Chip>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          color={t.slipId ? "success" : "default"}
+                          variant="flat"
+                          size="sm"
+                        >
+                          {t.slipId ? "Gerado" : "Nao gerado"}
                         </Chip>
                       </TableCell>
                       <TableCell>
@@ -725,13 +863,32 @@ export default function FinancialPage() {
                               </Button>
                             </DropdownTrigger>
                             <DropdownMenu aria-label="Ações do título">
-                              {t.status === "OPEN" ? (
+                              {(t.status === "OPEN" || t.status === "DELAYED") &&
+                              !t.slipId ? (
                                 <DropdownItem
                                   key="generate-slip"
                                   startContent={<Receipt size={16} />}
                                   onPress={() => generateSlip(t.id)}
                                 >
                                   Gerar Boleto
+                                </DropdownItem>
+                              ) : null}
+                              {t.slipId ? (
+                                <DropdownItem
+                                  key="print-slip"
+                                  startContent={<Printer size={16} />}
+                                  onPress={() => printSlip(t.slipId!)}
+                                >
+                                  Imprimir Boleto
+                                </DropdownItem>
+                              ) : null}
+                              {t.slipId ? (
+                                <DropdownItem
+                                  key="sync-slip"
+                                  startContent={<RefreshCw size={16} />}
+                                  onPress={() => syncSlipStatus(t)}
+                                >
+                                  Consultar Itaú
                                 </DropdownItem>
                               ) : null}
                               <DropdownItem
@@ -947,23 +1104,32 @@ export default function FinancialPage() {
                 value={newTitle.clientId}
                 onSelect={(client) => {
                   setSelectedClient(client);
-                  setNewTitle({ ...newTitle, clientId: client.id });
+                  setSelectedOrders([]);
+                  setNewTitle({
+                    ...newTitle,
+                    clientId: client.id,
+                    osIds: [],
+                    originalValue: selectedOrders.length > 0 ? "" : newTitle.originalValue,
+                  });
                 }}
                 onClear={() => {
                   setSelectedClient(null);
                   setSelectedOrders([]);
-                  setNewTitle({ ...newTitle, clientId: "", osIds: [] });
+                  setNewTitle({
+                    ...newTitle,
+                    clientId: "",
+                    osIds: [],
+                    originalValue: selectedOrders.length > 0 ? "" : newTitle.originalValue,
+                  });
                 }}
                 selectedClientName={selectedClient?.name}
               />
               <ServiceOrderSearchInput
                 clientId={selectedClient?.id || null}
                 selectedOrders={selectedOrders}
-                onAdd={(order) => setSelectedOrders([...selectedOrders, order])}
+                onAdd={(order) => updateSelectedOrders([...selectedOrders, order])}
                 onRemove={(orderId) =>
-                  setSelectedOrders(
-                    selectedOrders.filter((o) => o.id !== orderId),
-                  )
+                  updateSelectedOrders(selectedOrders.filter((o) => o.id !== orderId))
                 }
               />
             </div>
@@ -1011,6 +1177,7 @@ export default function FinancialPage() {
                   setNewTitle({ ...newTitle, originalValue: e.target.value })
                 }
                 startContent={<span className="text-sm text-gray-500">R$</span>}
+                isReadOnly={selectedOrders.length > 0}
                 isRequired
               />
               <Input
@@ -1053,6 +1220,76 @@ export default function FinancialPage() {
               onClick={handleCreateTitle}
             >
               Criar Título
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={isSlipResultOpen} onClose={onSlipResultClose} size="2xl">
+        <ModalContent>
+          <ModalHeader className="flex items-center gap-2">
+            <Receipt size={20} className="text-green-500" />
+            Boleto registrado
+          </ModalHeader>
+          <ModalBody className="space-y-4">
+            {generatedSlip && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Nosso numero</p>
+                    <p className="font-semibold">{generatedSlip.ourNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">ID Itau</p>
+                    <p className="font-semibold break-all">
+                      {generatedSlip.idBoletoIndividual || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Vencimento</p>
+                    <p className="font-semibold">
+                      {new Date(
+                        generatedSlip.dueDate + "T00:00:00",
+                      ).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Valor</p>
+                    <p className="font-semibold">
+                      {Number(generatedSlip.value).toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-black">Linha digitavel</p>
+                  <p className="font-mono text-sm break-all bg-gray-50 rounded-lg p-3">
+                    {generatedSlip.digitableLine || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-black">Codigo de barras</p>
+                  <p className="font-mono text-xs break-all bg-gray-50 rounded-lg p-3">
+                    {generatedSlip.barCode || "-"}
+                  </p>
+                </div>
+              </>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={onSlipResultClose}>
+              Fechar
+            </Button>
+            <Button
+              color="warning"
+              className="text-black"
+              startContent={<Printer size={16} />}
+              onPress={() => generatedSlip && printSlip(generatedSlip.id)}
+              isDisabled={!generatedSlip}
+            >
+              Imprimir Boleto
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -1107,6 +1344,8 @@ export default function FinancialPage() {
         onCancel={cancel}
         onUpdate={handleUpdate}
         onGenerateSlip={generateSlip}
+        onPrintSlip={printSlip}
+        onSyncSlip={syncSlipStatus}
         isLoading={!!actionLoading}
       />
     </AppLayout>
